@@ -6,21 +6,22 @@ import {
     INonfungiblePositionManager,
     PoolAddress
 } from "./vendor/INonfungiblePositionManager.sol";
-import { IPokeMe } from "./vendor/IPokeMe.sol";
+import { IPokeMe } from "./IPokeMe.sol";
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IEjectResolver } from "./IEjectResolver.sol";
+import { IEjectLP } from "./IEjectLP.sol";
 
-contract AutoEjectLP {
+contract EjectLP is IEjectLP {
     address public immutable gelato;
     IEjectResolver public immutable resolver;
     IPokeMe public immutable pokeMe;
-    INonfungiblePositionManager public immutable nftPositions;
+    INonfungiblePositionManager public immutable override nftPositions;
     IUniswapV3Factory public immutable factory;
 
     mapping(uint256 => bytes32) public hashById;
-    event SetEject(uint256 tokenId, IEjectResolver.Order task);
-    event Eject(uint256 tokenId);
+    event SetEject(IEjectResolver.Order order);
+    event Eject(uint256 tokenId, uint256 amount0Out, uint256 amount1Out, uint256 feeAmount);
 
     modifier onlyPokeMe() {
         require(msg.sender == address(pokeMe), "only pokeMe");
@@ -41,35 +42,36 @@ contract AutoEjectLP {
         resolver = _resolver;
     }
 
-    receive() external payable {} // solhint-disable-line no-empty-blocks
-
-    function schedule(
-        uint256 _tokenId,
-        IEjectResolver.Order memory _order,
-        address _feeToken
-    ) external {
-        require(nftPositions.ownerOf(_tokenId) == msg.sender, "caller must be owner");
-        _order.owner = msg.sender;
-        hashById[_tokenId] = keccak256(abi.encode(_order));
+    function schedule(OrderParams memory _orderParams) external override {
+        require(nftPositions.ownerOf(_orderParams.tokenId) == msg.sender, "caller must be owner");
+        IEjectResolver.Order memory order = IEjectResolver.Order({
+            tickThreshold: _orderParams.tickThreshold,
+            ejectAbove: _orderParams.ejectAbove,
+            amount0Min: _orderParams.amount0Min,
+            amount1Min: _orderParams.amount1Min,
+            receiver: _orderParams.receiver,
+            owner: msg.sender
+        });
+        hashById[_orderParams.tokenId] = keccak256(abi.encode(order));
         pokeMe.createTaskNoPrepayment(
             address(this),
             this.eject.selector,
             address(resolver),
             abi.encodeWithSelector(
                 resolver.checker.selector,
-                _tokenId,
-                _order
+                _orderParams.tokenId,
+                order
             ),
-            _feeToken
+            _orderParams.feeToken
         );
-        emit SetEject(_tokenId, _order);
+        emit SetEject(order);
     }
 
     // solhint-disable-next-line function-max-lines
     function eject(
         uint256 _tokenId,
         IEjectResolver.Order memory _order
-    ) external payable onlyPokeMe {
+    ) external onlyPokeMe {
         (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
         (address token0, address token1, uint128 liquidity) = _canEject(
             _tokenId,
@@ -97,20 +99,25 @@ contract AutoEjectLP {
         // handle payouts
         if (_order.amount0Min > 0 && amount0 > 0) {
             IERC20(token0).transfer(_order.receiver, amount0);
+        } else {
+            amount0 = 0;
         }
         if (_order.amount1Min > 0 && amount1 > 0) {
             IERC20(token1).transfer(_order.receiver, amount1);
+        } else {
+            amount1 = 0;
         }
 
         // gelato fee
         IERC20(feeToken).transfer(gelato, feeAmount);
 
-        emit Eject(_tokenId);
+        emit Eject(_tokenId, amount0, amount1, feeAmount);
     }
 
-    function cancel(uint256 _tokenId) external {
+    function cancel(uint256 _tokenId) external override {
         require(msg.sender == nftPositions.ownerOf(_tokenId), "only owner");
         delete hashById[_tokenId];
+        // TODO: pokeMe.cancelTask();
     }
 
     function _collect(
