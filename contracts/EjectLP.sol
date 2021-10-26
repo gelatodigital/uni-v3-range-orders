@@ -20,7 +20,7 @@ contract EjectLP is IEjectLP {
     IUniswapV3Factory public immutable factory;
 
     mapping(uint256 => bytes32) public hashById;
-    event SetEject(IEjectResolver.Order order);
+    event SetEject(OrderParams orderParams, address sender);
     event Eject(uint256 tokenId, uint256 amount0Out, uint256 amount1Out, uint256 feeAmount);
 
     modifier onlyPokeMe() {
@@ -64,7 +64,7 @@ contract EjectLP is IEjectLP {
             ),
             _orderParams.feeToken
         );
-        emit SetEject(order);
+        emit SetEject(_orderParams, msg.sender);
     }
 
     // solhint-disable-next-line function-max-lines
