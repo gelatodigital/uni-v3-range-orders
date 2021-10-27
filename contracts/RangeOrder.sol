@@ -21,56 +21,48 @@ import {
 } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {FullMath, LiquidityAmounts} from "./vendor/LiquidityAmounts.sol";
 import {IEjectLP} from "./IEjectLP.sol";
-import {OrderParams} from "./structs/SEject.sol";
+import {Order, OrderParams} from "./structs/SEject.sol";
+import {RangeOrderParams} from "./structs/SRangeOrder.sol";
 
 contract RangeOrder is IERC721Receiver {
     using SafeERC20 for IERC20;
 
-    struct RangeOrderParams {
-        address pool;
-        bool zeroForOne;
-        int24 tickThreshold;
-        uint256 amountIn;
-        uint256 minAmountOut;
-        address receiver;
-    }
-
     IEjectLP public immutable eject;
 
-    constructor(IEjectLP _eject) {
-        eject = _eject;
+    constructor(IEjectLP eject_) {
+        eject = eject_;
     }
 
     // solhint-disable-next-line function-max-lines
-    function setRangeOrder(RangeOrderParams calldata _params) external {
-        (, int24 tick, , , , , ) = IUniswapV3Pool(_params.pool).slot0();
-        int24 tickSpacing = IUniswapV3Pool(_params.pool).tickSpacing();
+    function setRangeOrder(RangeOrderParams calldata params_) external {
+        (, int24 tick, , , , , ) = IUniswapV3Pool(params_.pool).slot0();
+        int24 tickSpacing = IUniswapV3Pool(params_.pool).tickSpacing();
         require(
-            _params.tickThreshold % tickSpacing == 0,
+            params_.tickThreshold % tickSpacing == 0,
             "threshold must be initializable tick"
         );
-        int24 lowerTick = _params.zeroForOne
-            ? _params.tickThreshold - tickSpacing
-            : _params.tickThreshold;
-        int24 upperTick = _params.zeroForOne
-            ? _params.tickThreshold
-            : _params.tickThreshold + tickSpacing;
+        int24 lowerTick = params_.zeroForOne
+            ? params_.tickThreshold - tickSpacing
+            : params_.tickThreshold;
+        int24 upperTick = params_.zeroForOne
+            ? params_.tickThreshold
+            : params_.tickThreshold + tickSpacing;
         require(tick < lowerTick || tick > upperTick, "eject tick in range");
-        address token0 = IUniswapV3Pool(_params.pool).token0();
-        address token1 = IUniswapV3Pool(_params.pool).token1();
+        address token0 = IUniswapV3Pool(params_.pool).token0();
+        address token1 = IUniswapV3Pool(params_.pool).token1();
 
         INonfungiblePositionManager positions = eject.nftPositions();
         (uint256 tokenId, , , ) = positions.mint(
             INonfungiblePositionManager.MintParams({
                 token0: token0,
                 token1: token1,
-                fee: IUniswapV3Pool(_params.pool).fee(),
+                fee: IUniswapV3Pool(params_.pool).fee(),
                 tickLower: lowerTick,
                 tickUpper: upperTick,
-                amount0Desired: _params.zeroForOne ? _params.amountIn : 0,
-                amount1Desired: _params.zeroForOne ? 0 : _params.amountIn,
-                amount0Min: _params.zeroForOne ? _params.amountIn : 0,
-                amount1Min: _params.zeroForOne ? 0 : _params.amountIn,
+                amount0Desired: params_.zeroForOne ? params_.amountIn : 0,
+                amount1Desired: params_.zeroForOne ? 0 : params_.amountIn,
+                amount0Min: params_.zeroForOne ? params_.amountIn : 0,
+                amount1Min: params_.zeroForOne ? 0 : params_.amountIn,
                 recipient: address(this),
                 deadline: block.timestamp // solhint-disable-line not-rely-on-time
             })
@@ -79,12 +71,40 @@ contract RangeOrder is IERC721Receiver {
         eject.schedule(
             OrderParams({
                 tokenId: tokenId,
-                tickThreshold: _params.zeroForOne ? upperTick : lowerTick,
-                ejectAbove: _params.zeroForOne,
-                amount0Min: _params.zeroForOne ? 0 : _params.minAmountOut,
-                amount1Min: _params.zeroForOne ? _params.minAmountOut : 0,
-                receiver: _params.receiver,
-                feeToken: _params.zeroForOne ? token1 : token0
+                tickThreshold: params_.zeroForOne ? upperTick : lowerTick,
+                ejectAbove: params_.zeroForOne,
+                amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
+                amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
+                receiver: params_.receiver,
+                feeToken: params_.zeroForOne ? token1 : token0
+            })
+        );
+    }
+
+    function cancelRangeOrder(
+        uint256 tokenId_,
+        RangeOrderParams calldata params_
+    ) external {
+        (, int24 tick, , , , , ) = IUniswapV3Pool(params_.pool).slot0();
+        int24 tickSpacing = IUniswapV3Pool(params_.pool).tickSpacing();
+
+        int24 lowerTick = params_.zeroForOne
+            ? params_.tickThreshold - tickSpacing
+            : params_.tickThreshold;
+        int24 upperTick = params_.zeroForOne
+            ? params_.tickThreshold
+            : params_.tickThreshold + tickSpacing;
+        require(tick < lowerTick || tick > upperTick, "eject tick in range");
+
+        eject.cancel(
+            tokenId_,
+            Order({
+                tickThreshold: params_.zeroForOne ? upperTick : lowerTick,
+                ejectAbove: params_.zeroForOne,
+                amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
+                amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
+                receiver: params_.receiver,
+                owner: address(this)
             })
         );
     }

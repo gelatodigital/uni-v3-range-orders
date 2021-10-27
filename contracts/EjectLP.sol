@@ -1,29 +1,39 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
 
-import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import { 
+import {
+    IUniswapV3Pool
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {
     INonfungiblePositionManager,
     PoolAddress
 } from "./vendor/INonfungiblePositionManager.sol";
-import { IPokeMe } from "./IPokeMe.sol";
-import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IEjectResolver } from "./IEjectResolver.sol";
-import { IEjectLP } from "./IEjectLP.sol";
+import {IPokeMe} from "./IPokeMe.sol";
+import {
+    IUniswapV3Factory
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IEjectResolver} from "./IEjectResolver.sol";
+import {IEjectLP} from "./IEjectLP.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 
-
 contract EjectLP is IEjectLP {
-    address public immutable gelato;
-    IEjectResolver public immutable resolver;
+    address internal immutable _gelato;
+    IEjectResolver internal immutable _resolver;
+    IUniswapV3Factory internal immutable _factory;
     IPokeMe public immutable override pokeMe;
     INonfungiblePositionManager public immutable override nftPositions;
-    IUniswapV3Factory public immutable factory;
 
     mapping(uint256 => bytes32) public hashById;
+    mapping(uint256 => bytes32) public taskById;
     event SetEject(OrderParams orderParams, address sender);
-    event Eject(uint256 tokenId, uint256 amount0Out, uint256 amount1Out, uint256 feeAmount);
+    event Eject(
+        uint256 tokenId,
+        uint256 amount0Out,
+        uint256 amount1Out,
+        uint256 feeAmount
+    );
+    event Cancel(uint256 tokenId);
 
     modifier onlyPokeMe() {
         require(msg.sender == address(pokeMe), "only pokeMe");
@@ -31,60 +41,62 @@ contract EjectLP is IEjectLP {
     }
 
     constructor(
-        INonfungiblePositionManager _nftPositions,
-        IUniswapV3Factory _factory,
-        IPokeMe _pokeMe,
-        IEjectResolver _resolver,
-        address _gelato
+        INonfungiblePositionManager nftPositions_,
+        IUniswapV3Factory factory_,
+        IPokeMe pokeMe_,
+        IEjectResolver resolver_,
+        address gelato_
     ) {
-        pokeMe = _pokeMe;
-        factory = _factory;
-        nftPositions = _nftPositions;
-        gelato = _gelato;
-        resolver = _resolver;
+        pokeMe = pokeMe_;
+        _factory = factory_;
+        nftPositions = nftPositions_;
+        _gelato = gelato_;
+        _resolver = resolver_;
     }
 
-    function schedule(OrderParams memory _orderParams) external override {
-        require(nftPositions.ownerOf(_orderParams.tokenId) == msg.sender, "caller must be owner");
+    function schedule(OrderParams memory orderParams_) external override {
+        require(
+            nftPositions.ownerOf(orderParams_.tokenId) == msg.sender,
+            "caller must be owner"
+        );
         Order memory order = Order({
-            tickThreshold: _orderParams.tickThreshold,
-            ejectAbove: _orderParams.ejectAbove,
-            amount0Min: _orderParams.amount0Min,
-            amount1Min: _orderParams.amount1Min,
-            receiver: _orderParams.receiver,
+            tickThreshold: orderParams_.tickThreshold,
+            ejectAbove: orderParams_.ejectAbove,
+            amount0Min: orderParams_.amount0Min,
+            amount1Min: orderParams_.amount1Min,
+            receiver: orderParams_.receiver,
             owner: msg.sender
         });
-        hashById[_orderParams.tokenId] = keccak256(abi.encode(order));
-        pokeMe.createTaskNoPrepayment(
+        hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
+        taskById[orderParams_.tokenId] = pokeMe.createTaskNoPrepayment(
             address(this),
             this.eject.selector,
-            address(resolver),
+            address(_resolver),
             abi.encodeWithSelector(
-                resolver.checker.selector,
-                _orderParams.tokenId,
+                _resolver.checker.selector,
+                orderParams_.tokenId,
                 order
             ),
-            _orderParams.feeToken
+            orderParams_.feeToken
         );
-        emit SetEject(_orderParams, msg.sender);
+
+        emit SetEject(orderParams_, msg.sender);
     }
 
     // solhint-disable-next-line function-max-lines
-    function eject(
-        uint256 _tokenId,
-        Order memory _order
-    ) external override onlyPokeMe {
+    function eject(uint256 tokenId_, Order memory order_)
+        external
+        override
+        onlyPokeMe
+    {
         (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
         (address token0, address token1, uint128 liquidity) = canEject(
-            _tokenId,
-            _order,
+            tokenId_,
+            order_,
             feeToken
         );
 
-        (uint256 amount0, uint256 amount1) = _collect(
-            _tokenId,
-            liquidity
-        );
+        (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
 
         if (feeToken == token0) {
             amount0 -= feeAmount;
@@ -92,96 +104,158 @@ contract EjectLP is IEjectLP {
             amount1 -= feeAmount;
         }
         require(
-            amount0 >= _order.amount0Min && amount1 >= _order.amount1Min,
+            amount0 >= order_.amount0Min && amount1 >= order_.amount1Min,
             "received below minimum"
         );
-        
-        delete hashById[_tokenId];
+
+        delete hashById[tokenId_];
 
         // handle payouts
-        if (_order.amount0Min > 0 && amount0 > 0) {
-            IERC20(token0).transfer(_order.receiver, amount0);
+        if (order_.amount0Min > 0 && amount0 > 0) {
+            IERC20(token0).transfer(order_.receiver, amount0);
         } else {
             amount0 = 0;
         }
-        if (_order.amount1Min > 0 && amount1 > 0) {
-            IERC20(token1).transfer(_order.receiver, amount1);
+        if (order_.amount1Min > 0 && amount1 > 0) {
+            IERC20(token1).transfer(order_.receiver, amount1);
         } else {
             amount1 = 0;
         }
 
         // gelato fee
-        IERC20(feeToken).transfer(gelato, feeAmount);
+        IERC20(feeToken).transfer(_gelato, feeAmount);
 
-        emit Eject(_tokenId, amount0, amount1, feeAmount);
+        emit Eject(tokenId_, amount0, amount1, feeAmount);
     }
 
-    function cancel(uint256 _tokenId) external override {
-        require(msg.sender == nftPositions.ownerOf(_tokenId), "only owner");
-        delete hashById[_tokenId];
-        // TODO: pokeMe.cancelTask();
-    }
+    function cancel(uint256 tokenId_, Order memory order_) external override {
+        require(msg.sender == nftPositions.ownerOf(tokenId_), "only owner");
+        require(hashById[tokenId_] == keccak256(abi.encode(order_)));
 
-    function canEject(
-        uint256 _tokenId,
-        Order memory _order,
-        address _feeToken
-    ) public view override returns (address, address, uint128) {
-        require(_order.owner == nftPositions.ownerOf(_tokenId), "owner changed");
-        require(hashById[_tokenId] == keccak256(abi.encode(_order)), "incorrect task hash"); 
-        (   
-            ,address operator,
+        (
+            ,
+            ,
             address token0,
             address token1,
-            uint24 feeTier,,,
-            uint128 liquidity,,,,
-        ) = nftPositions.positions(_tokenId);
-        require(operator == address(this), "contract must be approved");
-        require(_feeToken == token0 || _feeToken == token1, "wrong fee token");
+            uint24 feeTier,
+            ,
+            ,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+        ) = nftPositions.positions(tokenId_);
 
-        IUniswapV3Pool pool = _pool(token0, token1, feeTier);
-        (, int24 tick, , , , , ) = pool.slot0();
-        if (_order.ejectAbove) {
-            require(tick > _order.tickThreshold, "price not met");
+        (, int24 tick, , , , , ) = _pool(token0, token1, feeTier).slot0();
+
+        if (order_.ejectAbove) {
+            require(tick < order_.tickThreshold, "price met");
         } else {
-            require(tick < _order.tickThreshold, "price not met");
+            require(tick > order_.tickThreshold, "price met");
+        }
+
+        (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
+
+        if (amount0 > 0) {
+            IERC20(token0).transfer(order_.receiver, amount0);
+        }
+        if (amount1 > 0) {
+            IERC20(token1).transfer(order_.receiver, amount1);
+        }
+
+        pokeMe.cancelTask(taskById[tokenId_]);
+
+        delete hashById[tokenId_];
+        delete taskById[tokenId_];
+    }
+
+    // solhint-disable-next-line function-max-lines
+    function canEject(
+        uint256 tokenId_,
+        Order memory order_,
+        address feeToken_
+    )
+        public
+        view
+        override
+        returns (
+            address,
+            address,
+            uint128
+        )
+    {
+        require(
+            order_.owner == nftPositions.ownerOf(tokenId_),
+            "owner changed"
+        );
+        require(
+            hashById[tokenId_] == keccak256(abi.encode(order_)),
+            "incorrect task hash"
+        );
+        (
+            ,
+            address operator,
+            address token0,
+            address token1,
+            uint24 feeTier,
+            ,
+            ,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+
+        ) = nftPositions.positions(tokenId_);
+        require(operator == address(this), "contract must be approved");
+        require(feeToken_ == token0 || feeToken_ == token1, "wrong fee token");
+
+        (, int24 tick, , , , , ) = _pool(token0, token1, feeTier).slot0();
+        if (order_.ejectAbove) {
+            require(tick > order_.tickThreshold, "price not met");
+        } else {
+            require(tick < order_.tickThreshold, "price not met");
         }
 
         return (token0, token1, liquidity);
     }
 
-    function _collect(
-        uint256 _tokenId,
-        uint128 _liquidity
-    ) internal returns(uint256 amount0, uint256 amount1) {
-        nftPositions.decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams({
-            tokenId: _tokenId,
-            liquidity: _liquidity,
-            amount0Min: 0,
-            amount1Min: 0,
-            deadline: block.timestamp // solhint-disable-line not-rely-on-time
-        }));
-        (amount0, amount1) = 
-            nftPositions.collect(INonfungiblePositionManager.CollectParams({
-                tokenId: _tokenId,
+    function _collect(uint256 tokenId_, uint128 liquidity_)
+        internal
+        returns (uint256 amount0, uint256 amount1)
+    {
+        nftPositions.decreaseLiquidity(
+            INonfungiblePositionManager.DecreaseLiquidityParams({
+                tokenId: tokenId_,
+                liquidity: liquidity_,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp // solhint-disable-line not-rely-on-time
+            })
+        );
+        (amount0, amount1) = nftPositions.collect(
+            INonfungiblePositionManager.CollectParams({
+                tokenId: tokenId_,
                 recipient: address(this),
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
-            }));
+            })
+        );
     }
 
     function _pool(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee
+        address tokenIn_,
+        address tokenOut_,
+        uint24 fee_
     ) internal view returns (IUniswapV3Pool pool) {
-        pool = IUniswapV3Pool(PoolAddress.computeAddress(
-            address(factory),
-            PoolAddress.PoolKey({
-                token0: tokenIn < tokenOut ? tokenIn : tokenOut,
-                token1: tokenIn < tokenOut ? tokenOut : tokenIn,
-                fee: fee
-            })
-        ));
+        pool = IUniswapV3Pool(
+            PoolAddress.computeAddress(
+                address(_factory),
+                PoolAddress.PoolKey({
+                    token0: tokenIn_ < tokenOut_ ? tokenIn_ : tokenOut_,
+                    token1: tokenIn_ < tokenOut_ ? tokenOut_ : tokenIn_,
+                    fee: fee_
+                })
+            )
+        );
     }
 }

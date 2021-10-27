@@ -8,20 +8,20 @@ import {IPokeMe} from "./IPokeMe.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 
 interface IEjectLP {
-    function cancel(uint256 _tokenId) external;
+    function cancel(uint256 tokenId_, Order memory order_) external;
 
-    function schedule(OrderParams memory _orderParams) external;
+    function schedule(OrderParams memory orderParams_) external;
 
-    function eject(uint256 _tokenId, Order memory _order) external;
+    function eject(uint256 tokenId_, Order memory order_) external;
 
     function pokeMe() external view returns (IPokeMe);
 
     function nftPositions() external view returns (INonfungiblePositionManager);
 
     function canEject(
-        uint256 _tokenId,
-        Order memory _order,
-        address _feeToken
+        uint256 tokenId_,
+        Order memory order_,
+        address feeToken_
     )
         external
         view
