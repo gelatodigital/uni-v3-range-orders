@@ -8,4 +8,5 @@ struct RangeOrderParams {
     uint256 amountIn;
     uint256 minAmountOut;
     address receiver;
+    uint256 maxFeeAmount;
 }

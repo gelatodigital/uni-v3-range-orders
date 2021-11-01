@@ -8,6 +8,7 @@ struct Order {
     uint256 amount1Min; // @note: will NOT transfer token1 if amount1Min = 0
     address receiver;
     address owner;
+    uint256 maxFeeAmount;
 }
 
 struct OrderParams {
@@ -18,4 +19,6 @@ struct OrderParams {
     uint256 amount1Min; // @note: will NOT transfer token1 if amount1Min = 0
     address receiver;
     address feeToken;
+    address resolver;
+    uint256 maxFeeAmount;
 }
