@@ -37,7 +37,10 @@ contract EjectLP is IEjectLP {
     event Cancel(uint256 tokenId);
 
     modifier onlyPokeMe() {
-        require(msg.sender == address(pokeMe), "EjectLP::onlyPokeMe: only pokeMe");
+        require(
+            msg.sender == address(pokeMe),
+            "EjectLP::onlyPokeMe: only pokeMe"
+        );
         _;
     }
 
@@ -73,6 +76,7 @@ contract EjectLP is IEjectLP {
         Order memory order = Order({
             tickThreshold: orderParams_.tickThreshold,
             ejectAbove: orderParams_.ejectAbove,
+            ejectDust: orderParams_.ejectDust,
             amount0Min: orderParams_.amount0Min,
             amount1Min: orderParams_.amount1Min,
             receiver: orderParams_.receiver,
@@ -134,10 +138,12 @@ contract EjectLP is IEjectLP {
         delete taskById[tokenId_];
 
         // handle payouts
-        if (amount0 > 0) {
+        if (order_.ejectAbove ? amount0 > 0 && order_.ejectDust : amount0 > 0) {
             IERC20(token0).safeTransfer(order_.receiver, amount0);
         }
-        if (amount1 > 0) {
+        if (
+            order_.ejectAbove ? amount1 > 0 : amount1 > 0 && order_.ejectDust
+        ) {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
@@ -153,8 +159,14 @@ contract EjectLP is IEjectLP {
         override
         isApproved(tokenId_)
     {
-        require(msg.sender == nftPositions.ownerOf(tokenId_), "EjectLP::cancel: only owner");
-        require(hashById[tokenId_] == keccak256(abi.encode(order_)));
+        require(
+            msg.sender == nftPositions.ownerOf(tokenId_),
+            "EjectLP::cancel: only owner"
+        );
+        require(
+            hashById[tokenId_] == keccak256(abi.encode(order_)),
+            "EjectLP::cancel: invalid hash"
+        );
 
         (
             ,
@@ -232,14 +244,29 @@ contract EjectLP is IEjectLP {
             ,
 
         ) = nftPositions.positions(tokenId_);
-        require(operator == address(this), "EjectLP::canEject: contract must be approved");
-        require(feeToken_ == token0 || feeToken_ == token1, "EjectLP::canEject: wrong fee token");
+        require(
+            operator == address(this),
+            "EjectLP::canEject: contract must be approved"
+        );
+        require(
+            feeToken_ == token0 || feeToken_ == token1,
+            "EjectLP::canEject: wrong fee token"
+        );
 
-        (, int24 tick, , , , , ) = _pool(token0, token1, feeTier).slot0();
+        IUniswapV3Pool pool = _pool(token0, token1, feeTier);
+        (, int24 tick, , , , , ) = pool.slot0();
+        int24 tickSpacing = pool.tickSpacing();
+
         if (order_.ejectAbove) {
-            require(tick > order_.tickThreshold, "EjectLP::canEject: price not met");
+            require(
+                tick > order_.tickThreshold + tickSpacing,
+                "EjectLP::canEject: price not met"
+            );
         } else {
-            require(tick < order_.tickThreshold, "EjectLP::canEject: price not met");
+            require(
+                tick < order_.tickThreshold - tickSpacing,
+                "EjectLP::canEject: price not met"
+            );
         }
 
         return (token0, token1, liquidity);
