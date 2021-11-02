@@ -50,11 +50,11 @@ contract RangeOrder is IERC721Receiver {
         );
 
         int24 lowerTick = params_.zeroForOne
-            ? params_.tickThreshold - tickSpacing
-            : params_.tickThreshold;
-        int24 upperTick = params_.zeroForOne
             ? params_.tickThreshold
-            : params_.tickThreshold + tickSpacing;
+            : params_.tickThreshold - tickSpacing;
+        int24 upperTick = params_.zeroForOne
+            ? params_.tickThreshold + tickSpacing
+            : params_.tickThreshold;
         require(tick < lowerTick || tick > upperTick, "eject tick in range");
 
         address token0 = pool.token0();
@@ -101,7 +101,7 @@ contract RangeOrder is IERC721Receiver {
             OrderParams({
                 tokenId: tokenId,
                 tickThreshold: params_.zeroForOne ? upperTick : lowerTick,
-                ejectAbove: params_.zeroForOne,
+                ejectAbove: !params_.zeroForOne,
                 amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
                 amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                 receiver: params_.receiver,
@@ -121,18 +121,18 @@ contract RangeOrder is IERC721Receiver {
         int24 tickSpacing = pool.tickSpacing();
 
         int24 lowerTick = params_.zeroForOne
-            ? params_.tickThreshold - tickSpacing
-            : params_.tickThreshold;
-        int24 upperTick = params_.zeroForOne
             ? params_.tickThreshold
-            : params_.tickThreshold + tickSpacing;
+            : params_.tickThreshold - tickSpacing;
+        int24 upperTick = params_.zeroForOne
+            ? params_.tickThreshold + tickSpacing
+            : params_.tickThreshold;
         require(tick < lowerTick || tick > upperTick, "eject tick in range");
 
         eject.cancel(
             tokenId_,
             Order({
                 tickThreshold: params_.zeroForOne ? upperTick : lowerTick,
-                ejectAbove: params_.zeroForOne,
+                ejectAbove: !params_.zeroForOne,
                 amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
                 amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                 receiver: params_.receiver,
