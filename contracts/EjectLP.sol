@@ -5,22 +5,23 @@ import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {
+    IERC20,
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPokeMe} from "./IPokeMe.sol";
+import {IEjectResolver} from "./IEjectResolver.sol";
+import {IEjectLP} from "./IEjectLP.sol";
+import {
     INonfungiblePositionManager,
     PoolAddress
 } from "./vendor/INonfungiblePositionManager.sol";
-import {IPokeMe} from "./IPokeMe.sol";
-import {
-    IUniswapV3Factory
-} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IEjectResolver} from "./IEjectResolver.sol";
-import {IEjectLP} from "./IEjectLP.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 
 contract EjectLP is IEjectLP {
+    using SafeERC20 for IERC20;
+
     address internal immutable _gelato;
-    IEjectResolver internal immutable _resolver;
-    IUniswapV3Factory internal immutable _factory;
+    address internal immutable _factory;
     IPokeMe public immutable override pokeMe;
     INonfungiblePositionManager public immutable override nftPositions;
 
@@ -36,46 +37,63 @@ contract EjectLP is IEjectLP {
     event Cancel(uint256 tokenId);
 
     modifier onlyPokeMe() {
-        require(msg.sender == address(pokeMe), "only pokeMe");
+        require(
+            msg.sender == address(pokeMe),
+            "EjectLP::onlyPokeMe: only pokeMe"
+        );
+        _;
+    }
+
+    modifier isApproved(uint256 tokenId_) {
+        require(
+            nftPositions.getApproved(tokenId_) == address(this),
+            "EjectLP::isApproved: EjectLP should be a operator"
+        );
         _;
     }
 
     constructor(
         INonfungiblePositionManager nftPositions_,
-        IUniswapV3Factory factory_,
+        address factory_,
         IPokeMe pokeMe_,
-        IEjectResolver resolver_,
         address gelato_
     ) {
-        pokeMe = pokeMe_;
-        _factory = factory_;
         nftPositions = nftPositions_;
+        _factory = factory_;
+        pokeMe = pokeMe_;
         _gelato = gelato_;
-        _resolver = resolver_;
     }
 
-    function schedule(OrderParams memory orderParams_) external override {
+    function schedule(OrderParams memory orderParams_)
+        external
+        override
+        isApproved(orderParams_.tokenId)
+    {
         require(
             nftPositions.ownerOf(orderParams_.tokenId) == msg.sender,
-            "caller must be owner"
+            "EjectLP:schedule:: caller must be owner"
         );
         Order memory order = Order({
             tickThreshold: orderParams_.tickThreshold,
             ejectAbove: orderParams_.ejectAbove,
+            ejectDust: orderParams_.ejectDust,
             amount0Min: orderParams_.amount0Min,
             amount1Min: orderParams_.amount1Min,
             receiver: orderParams_.receiver,
-            owner: msg.sender
+            owner: msg.sender,
+            maxFeeAmount: orderParams_.maxFeeAmount
         });
+
         hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
         taskById[orderParams_.tokenId] = pokeMe.createTaskNoPrepayment(
             address(this),
             this.eject.selector,
-            address(_resolver),
+            orderParams_.resolver,
             abi.encodeWithSelector(
-                _resolver.checker.selector,
+                IEjectResolver.checker.selector,
                 orderParams_.tokenId,
-                order
+                order,
+                orderParams_.feeToken
             ),
             orderParams_.feeToken
         );
@@ -90,6 +108,12 @@ contract EjectLP is IEjectLP {
         onlyPokeMe
     {
         (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
+
+        require(
+            feeAmount < order_.maxFeeAmount,
+            "EjectLP::eject: fee > maxFeeAmount"
+        );
+
         (address token0, address token1, uint128 liquidity) = canEject(
             tokenId_,
             order_,
@@ -105,32 +129,44 @@ contract EjectLP is IEjectLP {
         }
         require(
             amount0 >= order_.amount0Min && amount1 >= order_.amount1Min,
-            "received below minimum"
+            "EjectLP::eject: received below minimum"
         );
 
+        pokeMe.cancelTask(taskById[tokenId_]); // Cancel to desactivate the task.
+
         delete hashById[tokenId_];
+        delete taskById[tokenId_];
 
         // handle payouts
-        if (order_.amount0Min > 0 && amount0 > 0) {
-            IERC20(token0).transfer(order_.receiver, amount0);
-        } else {
-            amount0 = 0;
+        if (order_.ejectAbove ? amount0 > 0 && order_.ejectDust : amount0 > 0) {
+            IERC20(token0).safeTransfer(order_.receiver, amount0);
         }
-        if (order_.amount1Min > 0 && amount1 > 0) {
-            IERC20(token1).transfer(order_.receiver, amount1);
-        } else {
-            amount1 = 0;
+        if (
+            order_.ejectAbove ? amount1 > 0 : amount1 > 0 && order_.ejectDust
+        ) {
+            IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
         // gelato fee
-        IERC20(feeToken).transfer(_gelato, feeAmount);
+        IERC20(feeToken).safeTransfer(_gelato, feeAmount);
 
         emit Eject(tokenId_, amount0, amount1, feeAmount);
     }
 
-    function cancel(uint256 tokenId_, Order memory order_) external override {
-        require(msg.sender == nftPositions.ownerOf(tokenId_), "only owner");
-        require(hashById[tokenId_] == keccak256(abi.encode(order_)));
+    // solhint-disable-next-line function-max-lines
+    function cancel(uint256 tokenId_, Order memory order_)
+        external
+        override
+        isApproved(tokenId_)
+    {
+        require(
+            msg.sender == nftPositions.ownerOf(tokenId_),
+            "EjectLP::cancel: only owner"
+        );
+        require(
+            hashById[tokenId_] == keccak256(abi.encode(order_)),
+            "EjectLP::cancel: invalid hash"
+        );
 
         (
             ,
@@ -144,29 +180,30 @@ contract EjectLP is IEjectLP {
             ,
             ,
             ,
+
         ) = nftPositions.positions(tokenId_);
 
         (, int24 tick, , , , , ) = _pool(token0, token1, feeTier).slot0();
 
         if (order_.ejectAbove) {
-            require(tick < order_.tickThreshold, "price met");
+            require(tick < order_.tickThreshold, "EjectLP::cancel: price met");
         } else {
-            require(tick > order_.tickThreshold, "price met");
-        }
-
-        (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
-
-        if (amount0 > 0) {
-            IERC20(token0).transfer(order_.receiver, amount0);
-        }
-        if (amount1 > 0) {
-            IERC20(token1).transfer(order_.receiver, amount1);
+            require(tick > order_.tickThreshold, "EjectLP::cancel: price met");
         }
 
         pokeMe.cancelTask(taskById[tokenId_]);
 
         delete hashById[tokenId_];
         delete taskById[tokenId_];
+
+        (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
+
+        if (amount0 > 0) {
+            IERC20(token0).safeTransfer(order_.receiver, amount0);
+        }
+        if (amount1 > 0) {
+            IERC20(token1).safeTransfer(order_.receiver, amount1);
+        }
     }
 
     // solhint-disable-next-line function-max-lines
@@ -178,6 +215,7 @@ contract EjectLP is IEjectLP {
         public
         view
         override
+        isApproved(tokenId_)
         returns (
             address,
             address,
@@ -186,11 +224,11 @@ contract EjectLP is IEjectLP {
     {
         require(
             order_.owner == nftPositions.ownerOf(tokenId_),
-            "owner changed"
+            "EjectLP::canEject: owner changed"
         );
         require(
             hashById[tokenId_] == keccak256(abi.encode(order_)),
-            "incorrect task hash"
+            "EjectLP::canEject: incorrect task hash"
         );
         (
             ,
@@ -206,14 +244,29 @@ contract EjectLP is IEjectLP {
             ,
 
         ) = nftPositions.positions(tokenId_);
-        require(operator == address(this), "contract must be approved");
-        require(feeToken_ == token0 || feeToken_ == token1, "wrong fee token");
+        require(
+            operator == address(this),
+            "EjectLP::canEject: contract must be approved"
+        );
+        require(
+            feeToken_ == token0 || feeToken_ == token1,
+            "EjectLP::canEject: wrong fee token"
+        );
 
-        (, int24 tick, , , , , ) = _pool(token0, token1, feeTier).slot0();
+        IUniswapV3Pool pool = _pool(token0, token1, feeTier);
+        (, int24 tick, , , , , ) = pool.slot0();
+        int24 tickSpacing = pool.tickSpacing();
+
         if (order_.ejectAbove) {
-            require(tick > order_.tickThreshold, "price not met");
+            require(
+                tick > order_.tickThreshold + tickSpacing,
+                "EjectLP::canEject: price not met"
+            );
         } else {
-            require(tick < order_.tickThreshold, "price not met");
+            require(
+                tick < order_.tickThreshold - tickSpacing,
+                "EjectLP::canEject: price not met"
+            );
         }
 
         return (token0, token1, liquidity);
@@ -246,16 +299,17 @@ contract EjectLP is IEjectLP {
         address tokenIn_,
         address tokenOut_,
         uint24 fee_
-    ) internal view returns (IUniswapV3Pool pool) {
-        pool = IUniswapV3Pool(
-            PoolAddress.computeAddress(
-                address(_factory),
-                PoolAddress.PoolKey({
-                    token0: tokenIn_ < tokenOut_ ? tokenIn_ : tokenOut_,
-                    token1: tokenIn_ < tokenOut_ ? tokenOut_ : tokenIn_,
-                    fee: fee_
-                })
-            )
-        );
+    ) internal view returns (IUniswapV3Pool) {
+        return
+            IUniswapV3Pool(
+                PoolAddress.computeAddress(
+                    _factory,
+                    PoolAddress.PoolKey({
+                        token0: tokenIn_ < tokenOut_ ? tokenIn_ : tokenOut_,
+                        token1: tokenIn_ < tokenOut_ ? tokenOut_ : tokenIn_,
+                        fee: fee_
+                    })
+                )
+            );
     }
 }
