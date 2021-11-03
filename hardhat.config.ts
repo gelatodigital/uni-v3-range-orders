@@ -8,6 +8,7 @@ import "hardhat-deploy";
 
 // Process Env Variables
 import * as dotenv from "dotenv";
+import { ethers } from "ethers";
 dotenv.config({ path: __dirname + "/.env" });
 
 const PK = process.env.PK;
@@ -29,8 +30,11 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
-        blockNumber: 13476568
-      }
+        blockNumber: 13476568, // ether price $4,168.96
+      },
+      accounts: {
+        accountsBalance: ethers.utils.parseEther("10000").toString(),
+      },
     },
     goerli: {
       accounts: PK ? [PK] : [],
