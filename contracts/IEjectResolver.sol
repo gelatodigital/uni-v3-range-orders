@@ -4,8 +4,9 @@ pragma solidity 0.8.7;
 import {Order} from "./structs/SEject.sol";
 
 interface IEjectResolver {
-    function checker(uint256, Order memory order)
-        external
-        view
-        returns (bool, bytes memory);
+    function checker(
+        uint256,
+        Order memory order,
+        address feeToken_
+    ) external view returns (bool, bytes memory);
 }
