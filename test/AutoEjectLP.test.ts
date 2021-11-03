@@ -134,6 +134,7 @@ describe("Auto eject Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
+        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
         minAmountOut: minAmountOut,
@@ -154,6 +155,7 @@ describe("Auto eject Integration Test", function () {
       {
         tickThreshold,
         ejectAbove: true,
+        ejectDust: true,
         amount0Min: 0,
         amount1Min: minAmountOut,
         receiver,
@@ -196,6 +198,7 @@ describe("Auto eject Integration Test", function () {
       {
         tickThreshold,
         ejectAbove: true,
+        ejectDust: true,
         amount0Min: 0,
         amount1Min: minAmountOut,
         receiver,
@@ -230,6 +233,7 @@ describe("Auto eject Integration Test", function () {
           {
             tickThreshold,
             ejectAbove: true,
+            ejectDust: true,
             amount0Min: 0,
             amount1Min: minAmountOut,
             receiver,
@@ -311,6 +315,7 @@ describe("Auto eject Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
+        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
         minAmountOut: minAmountOut,
@@ -349,6 +354,7 @@ describe("Auto eject Integration Test", function () {
       addresses.WETH,
       500
     );
+
     const pool = (await ethers.getContractAt(
       "IUniswapV3Pool",
       poolAddress,
@@ -383,6 +389,7 @@ describe("Auto eject Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
+        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
         minAmountOut: minAmountOut,
@@ -401,6 +408,7 @@ describe("Auto eject Integration Test", function () {
     await rangeOrder.cancelRangeOrder(145227, {
       pool: pool.address,
       zeroForOne: true,
+      ejectDust: true,
       tickThreshold,
       amountIn: amountIn,
       minAmountOut: minAmountOut,

@@ -7,6 +7,7 @@ export interface Addresses {
   Gelato: string;
   WETH: string;
   DAI: string;
+  USDT: string;
 }
 
 export const getAddresses = (network: string): Addresses => {
@@ -21,6 +22,7 @@ export const getAddresses = (network: string): Addresses => {
         Gelato: "0x3CACa7b48D0573D793d3b0279b5F0029180E83b6",
         WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
         DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
       };
     case "mainnet":
       return {
@@ -32,6 +34,7 @@ export const getAddresses = (network: string): Addresses => {
         Gelato: "0x3CACa7b48D0573D793d3b0279b5F0029180E83b6",
         WETH: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
         DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
       };
     case "goerli":
       return {
@@ -43,6 +46,7 @@ export const getAddresses = (network: string): Addresses => {
         Gelato: "0x683913B3A32ada4F8100458A3E1675425BdAa7DF",
         WETH: "",
         DAI: "",
+        USDT: "",
       };
     default:
       throw new Error(`No addresses for Network: ${network}`);
