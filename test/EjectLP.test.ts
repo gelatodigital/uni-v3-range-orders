@@ -16,7 +16,7 @@ import { IWETH9 } from "../typechain/IWETH9";
 
 const { ethers, deployments } = hre;
 
-describe("Auto eject Integration Test", function () {
+describe("Eject LP Integration Test", function () {
   this.timeout(0);
 
   let user: Signer;

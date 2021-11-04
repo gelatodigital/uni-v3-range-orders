@@ -44,8 +44,8 @@ export const getAddresses = (network: string): Addresses => {
         UniswapV3Factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
         SwapRouter: "",
         Gelato: "0x683913B3A32ada4F8100458A3E1675425BdAa7DF",
-        WETH: "",
-        DAI: "",
+        WETH: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6",
+        DAI: "0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844",
         USDT: "",
       };
     default:
