@@ -27,14 +27,18 @@ contract EjectLP is IEjectLP {
 
     mapping(uint256 => bytes32) public hashById;
     mapping(uint256 => bytes32) public taskById;
-    event SetEject(OrderParams orderParams, address sender);
-    event Eject(
-        uint256 tokenId,
+    event LogSetEject(
+        uint256 indexed tokenId,
+        OrderParams indexed orderParams,
+        address sender
+    );
+    event LogEject(
+        uint256 indexed tokenId,
         uint256 amount0Out,
         uint256 amount1Out,
         uint256 feeAmount
     );
-    event Cancel(uint256 tokenId);
+    event LogCancelEject(uint256 indexed tokenId);
 
     modifier onlyPokeMe() {
         require(
@@ -98,7 +102,7 @@ contract EjectLP is IEjectLP {
             orderParams_.feeToken
         );
 
-        emit SetEject(orderParams_, msg.sender);
+        emit LogSetEject(orderParams_.tokenId, orderParams_, msg.sender);
     }
 
     // solhint-disable-next-line function-max-lines
@@ -141,16 +145,14 @@ contract EjectLP is IEjectLP {
         if (order_.ejectAbove ? amount0 > 0 && order_.ejectDust : amount0 > 0) {
             IERC20(token0).safeTransfer(order_.receiver, amount0);
         }
-        if (
-            order_.ejectAbove ? amount1 > 0 : amount1 > 0 && order_.ejectDust
-        ) {
+        if (order_.ejectAbove ? amount1 > 0 : amount1 > 0 && order_.ejectDust) {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
         // gelato fee
         IERC20(feeToken).safeTransfer(_gelato, feeAmount);
 
-        emit Eject(tokenId_, amount0, amount1, feeAmount);
+        emit LogEject(tokenId_, amount0, amount1, feeAmount);
     }
 
     // solhint-disable-next-line function-max-lines
@@ -204,6 +206,8 @@ contract EjectLP is IEjectLP {
         if (amount1 > 0) {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
+
+        emit LogCancelEject(tokenId_);
     }
 
     // solhint-disable-next-line function-max-lines

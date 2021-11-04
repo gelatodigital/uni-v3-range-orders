@@ -26,6 +26,16 @@ contract RangeOrder is IERC721Receiver {
     IWETH9 public immutable WETH9; // solhint-disable-line var-name-mixedcase
     address public immutable ejectResolver;
 
+    event LogSetRangeOrder(
+        uint256 indexed tokenId,
+        address pool,
+        address token0,
+        address token1,
+        uint24 fee,
+        uint256 amountIn,
+        address creator
+    );
+
     // solhint-disable-next-line var-name-mixedcase, func-param-name-mixedcase
     constructor(
         IEjectLP eject_,
@@ -41,75 +51,98 @@ contract RangeOrder is IERC721Receiver {
     function setRangeOrder(RangeOrderParams calldata params_) external payable {
         IUniswapV3Pool pool = IUniswapV3Pool(params_.pool);
 
-        (, int24 tick, , , , , ) = pool.slot0();
-        int24 tickSpacing = pool.tickSpacing();
+        uint256 tokenId;
+        address token0;
+        address token1;
+        uint24 fee;
+        {
+            (, int24 tick, , , , , ) = pool.slot0();
+            int24 tickSpacing = pool.tickSpacing();
 
-        require(
-            params_.tickThreshold % tickSpacing == 0,
-            "threshold must be initializable tick"
-        );
-
-        int24 lowerTick = params_.zeroForOne
-            ? params_.tickThreshold
-            : params_.tickThreshold - tickSpacing;
-        int24 upperTick = params_.zeroForOne
-            ? params_.tickThreshold + tickSpacing
-            : params_.tickThreshold;
-        require(tick < lowerTick || tick > upperTick, "eject tick in range");
-
-        address token0 = pool.token0();
-        address token1 = pool.token1();
-
-        INonfungiblePositionManager positions = eject.nftPositions();
-
-        IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
-
-        if (msg.value > 0) {
             require(
-                msg.value == params_.amountIn,
-                "RangeOrder:setRangeOrder:: Invalid amount in."
-            );
-            require(
-                address(tokenIn) == address(WETH9),
-                "RangeOrder:setRangeOrder:: ETH range order should use WETH token."
+                params_.tickThreshold % tickSpacing == 0,
+                "threshold must be initializable tick"
             );
 
-            WETH9.deposit{value: msg.value}();
+            int24 lowerTick = params_.zeroForOne
+                ? params_.tickThreshold
+                : params_.tickThreshold - tickSpacing;
+            int24 upperTick = params_.zeroForOne
+                ? params_.tickThreshold + tickSpacing
+                : params_.tickThreshold;
+            require(
+                tick < lowerTick || tick > upperTick,
+                "eject tick in range"
+            );
+
+            token0 = pool.token0();
+            token1 = pool.token1();
+            fee = pool.fee();
+
+            INonfungiblePositionManager positions = eject.nftPositions();
+
+            IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
+
+            if (msg.value > 0) {
+                require(
+                    msg.value == params_.amountIn,
+                    "RangeOrder:setRangeOrder:: Invalid amount in."
+                );
+                require(
+                    address(tokenIn) == address(WETH9),
+                    "RangeOrder:setRangeOrder:: ETH range order should use WETH token."
+                );
+
+                WETH9.deposit{value: msg.value}();
+            } else
+                tokenIn.safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    params_.amountIn
+                );
+
+            tokenIn.safeApprove(address(positions), params_.amountIn);
+
+            (tokenId, , , ) = positions.mint(
+                INonfungiblePositionManager.MintParams({
+                    token0: token0,
+                    token1: token1,
+                    fee: fee,
+                    tickLower: lowerTick,
+                    tickUpper: upperTick,
+                    amount0Desired: params_.zeroForOne ? params_.amountIn : 0,
+                    amount1Desired: params_.zeroForOne ? 0 : params_.amountIn,
+                    amount0Min: params_.zeroForOne ? params_.amountIn : 0,
+                    amount1Min: params_.zeroForOne ? 0 : params_.amountIn,
+                    recipient: address(this),
+                    deadline: block.timestamp // solhint-disable-line not-rely-on-time
+                })
+            );
+            positions.approve(address(eject), tokenId);
+            eject.schedule(
+                OrderParams({
+                    tokenId: tokenId,
+                    tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
+                    ejectAbove: params_.zeroForOne,
+                    ejectDust: params_.ejectDust,
+                    amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
+                    amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
+                    receiver: params_.receiver,
+                    feeToken: params_.zeroForOne ? token1 : token0,
+                    resolver: ejectResolver,
+                    maxFeeAmount: params_.maxFeeAmount
+                })
+            );
         }
-        else
-            tokenIn.safeTransferFrom(msg.sender, address(this), params_.amountIn);
 
-        tokenIn.safeApprove(address(positions), params_.amountIn);
-
-        (uint256 tokenId, , , ) = positions.mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: pool.fee(),
-                tickLower: lowerTick,
-                tickUpper: upperTick,
-                amount0Desired: params_.zeroForOne ? params_.amountIn : 0,
-                amount1Desired: params_.zeroForOne ? 0 : params_.amountIn,
-                amount0Min: params_.zeroForOne ? params_.amountIn : 0,
-                amount1Min: params_.zeroForOne ? 0 : params_.amountIn,
-                recipient: address(this),
-                deadline: block.timestamp // solhint-disable-line not-rely-on-time
-            })
-        );
-        positions.approve(address(eject), tokenId);
-        eject.schedule(
-            OrderParams({
-                tokenId: tokenId,
-                tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
-                ejectAbove: params_.zeroForOne,
-                ejectDust: params_.ejectDust,
-                amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
-                amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
-                receiver: params_.receiver,
-                feeToken: params_.zeroForOne ? token1 : token0,
-                resolver: ejectResolver,
-                maxFeeAmount: params_.maxFeeAmount
-            })
+        emit LogSetRangeOrder(
+            tokenId,
+            params_.pool,
+            token0,
+            token1,
+            fee,
+            params_.amountIn,
+            msg.sender
         );
     }
 
