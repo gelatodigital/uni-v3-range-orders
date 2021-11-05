@@ -42,9 +42,9 @@ export const getAddresses = (network: string): Addresses => {
         NonfungiblePositionManager:
           "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
         UniswapV3Factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
-        SwapRouter: "",
+        SwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
         Gelato: "0x683913B3A32ada4F8100458A3E1675425BdAa7DF",
-        WETH: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6",
+        WETH: "0x60D4dB9b534EF9260a88b0BED6c486fe13E604Fc",
         DAI: "0x11fE4B6AE13d2a6055C8D9cF65c55bac32B5d844",
         USDT: "",
       };
