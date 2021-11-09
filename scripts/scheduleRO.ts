@@ -5,18 +5,14 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 //const addresses = getAddresses(network.name);
 
 const op = async (signer: SignerWithAddress) => {
-  const rangeOrder = await ethers.getContractAt(
-    "RangeOrder",
-    "0x640834289c9D6846BCB57D02d170AD7D78cfAAa5", // RangeOrder contract
-    signer
-  );
+  const rangeOrder = await ethers.getContract("RangeOrder", signer);
   const pool = await ethers.getContractAt(
     "IUniswapV3Pool",
     "0x3965B48bb9815A0E87754fBE313BB39Bb13dC544",
     signer
-);
+  );
   const token = await ethers.getContractAt(
-    "IERC20",
+    "ERC20",
     await pool.token1(),
     signer
   );
@@ -26,18 +22,20 @@ const op = async (signer: SignerWithAddress) => {
   );
   console.log("approve tx:", approveTx.hash);
   await approveTx.wait();
-  const tx = await rangeOrder.setRangeOrder(
-    {
-        pool: pool.address, // uniswap v3 pool address
-        zeroForOne: false,
-        ejectDust: false,
-        tickThreshold: 42000,
-        amountIn: ethers.utils.parseEther("100"),
-        minAmountOut: ethers.utils.parseEther("0.1"),
-        receiver: signer.address,
-        maxFeeAmount: ethers.constants.MaxUint256,
-    }
+  console.log(
+    "User balance of Token 1 : ",
+    (await token.balanceOf(signer.address)).toString()
   );
+  const tx = await rangeOrder.setRangeOrder({
+    pool: pool.address, // uniswap v3 pool address
+    zeroForOne: false,
+    ejectDust: false,
+    tickThreshold: 41257 - (41257 % 60) - 60,
+    amountIn: ethers.utils.parseEther("100"),
+    minAmountOut: ethers.utils.parseEther("0.1"),
+    receiver: signer.address,
+    maxFeeAmount: ethers.constants.MaxUint256,
+  });
   console.log("range order tx:", tx.hash);
 };
 
@@ -46,6 +44,6 @@ const op = async (signer: SignerWithAddress) => {
     const [signer] = await ethers.getSigners();
     await op(signer);
   } else {
-    console.log("MUST be network goerli for this script, goodbye.")
+    console.log("MUST be network goerli for this script, goodbye.");
   }
 })();
