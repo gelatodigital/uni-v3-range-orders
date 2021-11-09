@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
+pragma abicoder v2;
 
 import {
     IUniswapV3Pool
@@ -29,7 +30,7 @@ contract EjectLP is IEjectLP {
     mapping(uint256 => bytes32) public taskById;
     event LogSetEject(
         uint256 indexed tokenId,
-        OrderParams indexed orderParams,
+        OrderParams orderParams,
         address sender
     );
     event LogEject(
