@@ -16,7 +16,8 @@
     "verify": "npx hardhat etherscan-verify",
     "script:depositWeth-goerli": "npx hardhat --network goerli run ./scripts/depositWeth.ts",
     "script:scheduleRO-goerli": "npx hardhat --network goerli run ./scripts/scheduleRO.ts",
-    "script:swapTest": "npx hardhat --network goerli run ./scripts/scheduleRO.ts"
+    "script:swapTest": "npx hardhat --network goerli run ./scripts/scheduleRO.ts",
+    "script:cancelRO": "npx hardhat --network goerli run ./scripts/cancelRO.ts"
   },
   "repository": {
     "type": "git",
