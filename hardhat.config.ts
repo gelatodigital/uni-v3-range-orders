@@ -8,7 +8,7 @@ import "hardhat-deploy";
 
 // Process Env Variables
 import * as dotenv from "dotenv";
-import { ethers } from "ethers";
+import { ethers, utils } from "ethers";
 dotenv.config({ path: __dirname + "/.env" });
 
 const PK = process.env.PK;
@@ -42,11 +42,12 @@ const config: HardhatUserConfig = {
       accounts: PK ? [PK] : [],
       chainId: 5,
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_ID}`,
+      gasPrice: parseInt(utils.parseUnits("60", "gwei").toString()),
     },
     arbitrum: {
-      accounts: PK_ARBITRUM ? [PK_ARBITRUM]:[],
+      accounts: PK_ARBITRUM ? [PK_ARBITRUM] : [],
       chainId: 42161,
-      url: `https://arb-mainnet.g.alchemy.com/v2/${ARBITRUM_ALCHEMY_ID}`
+      url: `https://arb-mainnet.g.alchemy.com/v2/${ARBITRUM_ALCHEMY_ID}`,
     },
     mainnet: {
       accounts: PK_MAINNET ? [PK_MAINNET] : [],
