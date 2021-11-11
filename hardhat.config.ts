@@ -66,6 +66,26 @@ const config: HardhatUserConfig = {
         version: "0.8.7",
         settings: {
           optimizer: { enabled: true, runs: 200 },
+          modelChecker: {
+            targets: [
+              "balance",
+              "outOfBounds",
+              "popEmptyArray",
+              "constantCondition",
+              "divByZero",
+              "assert",
+              "underflow",
+              "overflow",
+            ],
+            showUnproved: true,
+            engine: "none",
+            // contracts: {
+            //   "contracts/RangeOrder.sol": ["RangeOrder"],
+            //   "contracts/RangeOrderResolver.sol": ["RangeOrderResolver"],
+            //   "contracts/EjectLP.sol": ["EjectLP"],
+            // },
+            // invariants: ["contract", "reentrancy"],
+          },
         },
       },
     ],
