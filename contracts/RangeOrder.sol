@@ -132,17 +132,18 @@ contract RangeOrder is IERC721Receiver {
             );
         }
 
-        emit LogSetRangeOrder(
-            tokenId,
-            address(params_.pool),
-            params_.amountIn
-        );
+        emit LogSetRangeOrder(tokenId, address(params_.pool), params_.amountIn);
     }
 
     function cancelRangeOrder(
         uint256 tokenId_,
         RangeOrderParams calldata params_
     ) external {
+        require(
+            params_.receiver == msg.sender,
+            "RangeOrder::cancelRangeOrder: only receiver."
+        );
+
         int24 tickSpacing = params_.pool.tickSpacing();
 
         int24 lowerTick = params_.zeroForOne

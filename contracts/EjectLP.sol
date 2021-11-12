@@ -49,6 +49,11 @@ contract EjectLP is IEjectLP {
         _;
     }
 
+    modifier onlyGelato() {
+        require(msg.sender == _gelato, "EjectLP::onlyPokeMe: only gelato");
+        _;
+    }
+
     modifier isApproved(uint256 tokenId_) {
         require(
             nftPositions.getApproved(tokenId_) == address(this),
@@ -203,14 +208,33 @@ contract EjectLP is IEjectLP {
 
         (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
 
-        if (amount0 > 0) {
+        if (order_.ejectAbove ? amount0 > 0 : amount0 > 0 && order_.ejectDust) {
             IERC20(token0).safeTransfer(order_.receiver, amount0);
         }
-        if (amount1 > 0) {
+        if (order_.ejectAbove ? amount1 > 0 && order_.ejectDust : amount1 > 0) {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
         emit LogCancelEject(tokenId_);
+    }
+
+    function mulipleRetrieveDust(address[] calldata tokens_, address recipient_)
+        external
+        onlyGelato
+    {
+        for (uint256 i = 0; i < tokens_.length; i++) {
+            retrieveDust(tokens_[i], recipient_);
+        }
+    }
+
+    function retrieveDust(address token_, address recipient_)
+        public
+        onlyGelato
+    {
+        IERC20 token = IERC20(token_);
+        uint256 balance = token.balanceOf(address(this));
+
+        if (balance > 0) token.safeTransfer(recipient_, balance);
     }
 
     // solhint-disable-next-line function-max-lines
@@ -240,20 +264,8 @@ contract EjectLP is IEjectLP {
         IUniswapV3Pool pool;
         {
             uint24 feeTier;
-            (
-                ,
-                ,
-                token0,
-                token1,
-                feeTier,
-                ,
-                ,
-                liquidity,
-                ,
-                ,
-                ,
-
-            ) = nftPositions.positions(tokenId_);
+            (, , token0, token1, feeTier, , , liquidity, , , , ) = nftPositions
+                .positions(tokenId_);
             pool = _pool(token0, token1, feeTier);
         }
         require(
