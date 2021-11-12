@@ -5,13 +5,13 @@ pragma abicoder v2;
 import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IPokeMe} from "./IPokeMe.sol";
+import {IEjectResolver} from "./IEjectResolver.sol";
+import {IEjectLP} from "./IEjectLP.sol";
 import {
     IERC20,
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IPokeMe} from "./IPokeMe.sol";
-import {IEjectResolver} from "./IEjectResolver.sol";
-import {IEjectLP} from "./IEjectLP.sol";
 import {
     INonfungiblePositionManager,
     PoolAddress
@@ -21,10 +21,10 @@ import {Order, OrderParams} from "./structs/SEject.sol";
 contract EjectLP is IEjectLP {
     using SafeERC20 for IERC20;
 
-    address internal immutable _gelato;
+    INonfungiblePositionManager public immutable override nftPositions;
     address internal immutable _factory;
     IPokeMe public immutable override pokeMe;
-    INonfungiblePositionManager public immutable override nftPositions;
+    address internal immutable _gelato;
 
     mapping(uint256 => bytes32) public hashById;
     mapping(uint256 => bytes32) public taskById;
@@ -57,6 +57,14 @@ contract EjectLP is IEjectLP {
         _;
     }
 
+    modifier onlyPositionOwner(uint256 tokenId_, address owner_) {
+        require(
+            nftPositions.ownerOf(tokenId_) == owner_,
+            "EjectLP:schedule:: only owner"
+        );
+        _;
+    }
+
     constructor(
         INonfungiblePositionManager nftPositions_,
         address factory_,
@@ -73,11 +81,8 @@ contract EjectLP is IEjectLP {
         external
         override
         isApproved(orderParams_.tokenId)
+        onlyPositionOwner(orderParams_.tokenId, msg.sender)
     {
-        require(
-            nftPositions.ownerOf(orderParams_.tokenId) == msg.sender,
-            "EjectLP:schedule:: caller must be owner"
-        );
         Order memory order = Order({
             tickThreshold: orderParams_.tickThreshold,
             ejectAbove: orderParams_.ejectAbove,
@@ -161,11 +166,8 @@ contract EjectLP is IEjectLP {
         external
         override
         isApproved(tokenId_)
+        onlyPositionOwner(tokenId_, msg.sender)
     {
-        require(
-            msg.sender == nftPositions.ownerOf(tokenId_),
-            "EjectLP::cancel: only owner"
-        );
         require(
             hashById[tokenId_] == keccak256(abi.encode(order_)),
             "EjectLP::cancel: invalid hash"
@@ -221,6 +223,7 @@ contract EjectLP is IEjectLP {
         view
         override
         isApproved(tokenId_)
+        onlyPositionOwner(tokenId_, order_.owner)
         returns (
             address,
             address,
@@ -228,50 +231,51 @@ contract EjectLP is IEjectLP {
         )
     {
         require(
-            order_.owner == nftPositions.ownerOf(tokenId_),
-            "EjectLP::canEject: owner changed"
-        );
-        require(
             hashById[tokenId_] == keccak256(abi.encode(order_)),
             "EjectLP::canEject: incorrect task hash"
         );
-        (
-            ,
-            address operator,
-            address token0,
-            address token1,
-            uint24 feeTier,
-            ,
-            ,
-            uint128 liquidity,
-            ,
-            ,
-            ,
+        address token0;
+        address token1;
+        uint128 liquidity;
+        IUniswapV3Pool pool;
+        {
+            uint24 feeTier;
+            (
+                ,
+                ,
+                token0,
+                token1,
+                feeTier,
+                ,
+                ,
+                liquidity,
+                ,
+                ,
+                ,
 
-        ) = nftPositions.positions(tokenId_);
-        require(
-            operator == address(this),
-            "EjectLP::canEject: contract must be approved"
-        );
+            ) = nftPositions.positions(tokenId_);
+            pool = _pool(token0, token1, feeTier);
+        }
         require(
             feeToken_ == token0 || feeToken_ == token1,
             "EjectLP::canEject: wrong fee token"
         );
 
-        IUniswapV3Pool pool = _pool(token0, token1, feeTier);
-        (, int24 tick, , , , , ) = pool.slot0();
-        int24 tickSpacing = pool.tickSpacing();
+        {
+            (, int24 tick, , , , , ) = pool.slot0();
+            int24 tickSpacing = pool.tickSpacing();
 
-        if (order_.ejectAbove) {
-            require(
-                tick > order_.tickThreshold + tickSpacing,
-                "EjectLP::canEject: price not met"
-            );
-        } else {
-            require(
-                tick < order_.tickThreshold - tickSpacing,
-                "EjectLP::canEject: price not met"
-            );
+            if (order_.ejectAbove) {
+                require(
+                    tick > order_.tickThreshold + tickSpacing,
+                    "EjectLP::canEject: price not met"
+                );
+            } else {
+                require(
+                    tick < order_.tickThreshold - tickSpacing,
+                    "EjectLP::canEject: price not met"
+                );
+            }
         }
 
         return (token0, token1, liquidity);

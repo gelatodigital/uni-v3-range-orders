@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
 
+import {
+    IUniswapV3Pool
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
 struct RangeOrderParams {
-    address pool;
+    IUniswapV3Pool pool;
     bool zeroForOne;
     bool ejectDust;
     int24 tickThreshold;

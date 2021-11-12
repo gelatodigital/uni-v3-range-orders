@@ -8,14 +8,14 @@ import {
     INonfungiblePositionManager
 } from "./vendor/INonfungiblePositionManager.sol";
 import {
-    IERC20,
-    SafeERC20
-} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {
     IERC721Receiver
 } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IWETH9} from "./vendor/IWETH9.sol";
 import {IEjectLP} from "./IEjectLP.sol";
+import {
+    IERC20,
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 import {RangeOrderParams} from "./structs/SRangeOrder.sol";
 
@@ -24,84 +24,81 @@ contract RangeOrder is IERC721Receiver {
 
     IEjectLP public immutable eject;
     IWETH9 public immutable WETH9; // solhint-disable-line var-name-mixedcase
-    address public immutable ejectResolver;
+    address public immutable rangeOrderResolver;
 
     event LogSetRangeOrder(
         uint256 indexed tokenId,
         address pool,
-        address token0,
-        address token1,
-        uint24 fee,
-        uint256 amountIn,
-        address creator
+        uint256 amountIn
     );
 
     // solhint-disable-next-line var-name-mixedcase, func-param-name-mixedcase
     constructor(
         IEjectLP eject_,
         IWETH9 WETH9_, // solhint-disable-line var-name-mixedcase, func-param-name-mixedcase
-        address ejectResolver_
+        address rangeOrderResolver_
     ) {
         eject = eject_;
         WETH9 = WETH9_;
-        ejectResolver = ejectResolver_;
+        rangeOrderResolver = rangeOrderResolver_;
     }
 
     // solhint-disable-next-line function-max-lines
     function setRangeOrder(RangeOrderParams calldata params_) external payable {
-        IUniswapV3Pool pool = IUniswapV3Pool(params_.pool);
-
         uint256 tokenId;
         address token0;
         address token1;
         uint24 fee;
         {
-            (, int24 tick, , , , , ) = pool.slot0();
-            int24 tickSpacing = pool.tickSpacing();
+            int24 lowerTick;
+            int24 upperTick;
+            {
+                int24 tickSpacing = params_.pool.tickSpacing();
 
-            require(
-                params_.tickThreshold % tickSpacing == 0,
-                "threshold must be initializable tick"
-            );
+                require(
+                    params_.tickThreshold % tickSpacing == 0,
+                    "RangeOrder:setRangeOrder:: threshold must be initializable tick"
+                );
 
-            int24 lowerTick = params_.zeroForOne
-                ? params_.tickThreshold
-                : params_.tickThreshold - tickSpacing;
-            int24 upperTick = params_.zeroForOne
-                ? params_.tickThreshold + tickSpacing
-                : params_.tickThreshold;
-            require(
-                tick < lowerTick || tick > upperTick,
-                "eject tick in range"
-            );
+                lowerTick = params_.zeroForOne
+                    ? params_.tickThreshold
+                    : params_.tickThreshold - tickSpacing;
+                upperTick = params_.zeroForOne
+                    ? params_.tickThreshold + tickSpacing
+                    : params_.tickThreshold;
+            }
 
-            token0 = pool.token0();
-            token1 = pool.token1();
-            fee = pool.fee();
+            _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
+
+            token0 = params_.pool.token0();
+            token1 = params_.pool.token1();
+            fee = params_.pool.fee();
 
             INonfungiblePositionManager positions = eject.nftPositions();
 
-            IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
+            {
+                IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
-            if (msg.value > 0) {
-                require(
-                    msg.value == params_.amountIn,
-                    "RangeOrder:setRangeOrder:: Invalid amount in."
-                );
-                require(
-                    address(tokenIn) == address(WETH9),
-                    "RangeOrder:setRangeOrder:: ETH range order should use WETH token."
-                );
+                if (msg.value > 0) {
+                    require(
+                        msg.value == params_.amountIn,
+                        "RangeOrder:setRangeOrder:: Invalid amount in."
+                    );
+                    require(
+                        address(tokenIn) == address(WETH9),
+                        "RangeOrder:setRangeOrder:: ETH range order should use WETH token."
+                    );
 
-                WETH9.deposit{value: msg.value}();
-            } else
-                tokenIn.safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    params_.amountIn
-                );
+                    WETH9.deposit{value: msg.value}();
+                } else
+                    tokenIn.safeTransferFrom(
+                        msg.sender,
+                        address(this),
+                        params_.amountIn
+                    );
 
-            tokenIn.safeApprove(address(positions), params_.amountIn);
+                tokenIn.safeApprove(address(positions), params_.amountIn);
+            }
 
             (tokenId, , , ) = positions.mint(
                 INonfungiblePositionManager.MintParams({
@@ -129,7 +126,7 @@ contract RangeOrder is IERC721Receiver {
                     amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                     receiver: params_.receiver,
                     feeToken: params_.zeroForOne ? token1 : token0,
-                    resolver: ejectResolver,
+                    resolver: rangeOrderResolver,
                     maxFeeAmount: params_.maxFeeAmount
                 })
             );
@@ -137,12 +134,8 @@ contract RangeOrder is IERC721Receiver {
 
         emit LogSetRangeOrder(
             tokenId,
-            params_.pool,
-            token0,
-            token1,
-            fee,
-            params_.amountIn,
-            msg.sender
+            address(params_.pool),
+            params_.amountIn
         );
     }
 
@@ -150,9 +143,7 @@ contract RangeOrder is IERC721Receiver {
         uint256 tokenId_,
         RangeOrderParams calldata params_
     ) external {
-        IUniswapV3Pool pool = IUniswapV3Pool(params_.pool);
-        (, int24 tick, , , , , ) = pool.slot0();
-        int24 tickSpacing = pool.tickSpacing();
+        int24 tickSpacing = params_.pool.tickSpacing();
 
         int24 lowerTick = params_.zeroForOne
             ? params_.tickThreshold
@@ -160,7 +151,7 @@ contract RangeOrder is IERC721Receiver {
         int24 upperTick = params_.zeroForOne
             ? params_.tickThreshold + tickSpacing
             : params_.tickThreshold;
-        require(tick < lowerTick || tick > upperTick, "eject tick in range");
+        _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
 
         eject.cancel(
             tokenId_,
@@ -184,5 +175,18 @@ contract RangeOrder is IERC721Receiver {
         bytes calldata
     ) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
+    }
+
+    function _requireThresholdNotInRange(
+        IUniswapV3Pool pool_,
+        int24 lowerTick_,
+        int24 upperTick_
+    ) internal view {
+        (, int24 tick, , , , , ) = pool_.slot0();
+
+        require(
+            tick < lowerTick_ || tick > upperTick_,
+            "RangeOrder:_requireThresholdInRange:: eject tick in range"
+        );
     }
 }
