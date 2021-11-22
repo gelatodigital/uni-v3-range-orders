@@ -11,6 +11,7 @@ export interface Addresses {
   EjectLP: string;
   RangeOrders: string;
   RangeOrdersResolver: string;
+  TestPool: string; // WETH DAI pool
 }
 
 export const getAddresses = (network: string): Addresses => {
@@ -29,6 +30,7 @@ export const getAddresses = (network: string): Addresses => {
         EjectLP: "",
         RangeOrders: "",
         RangeOrdersResolver: "",
+        TestPool: "",
       };
     case "arbitrum":
       return {
@@ -39,11 +41,12 @@ export const getAddresses = (network: string): Addresses => {
         SwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
         Gelato: "0x4775aF8FEf4809fE10bf05867d2b038a4b5B2146",
         WETH: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
-        DAI: "",
+        DAI: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
         USDT: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
-        EjectLP: "",
-        RangeOrders: "",
-        RangeOrdersResolver: "",
+        EjectLP: "0x7c9AEE9a3a3A9107F05F341C1cC1cBe645FD816B",
+        RangeOrders: "0x11F94423BB98108a756e1c1a9E909e388A6112C4",
+        RangeOrdersResolver: "0x1fFA51854d7360aeEf84Ae850EBBfBD920F439BD",
+        TestPool: "0x31Fa55e03bAD93C7f8AFfdd2eC616EbFde246001",
       };
     case "mainnet":
       return {
@@ -59,6 +62,7 @@ export const getAddresses = (network: string): Addresses => {
         EjectLP: "",
         RangeOrders: "",
         RangeOrdersResolver: "",
+        TestPool: "",
       };
     case "goerli":
       return {
@@ -74,6 +78,7 @@ export const getAddresses = (network: string): Addresses => {
         EjectLP: "0xC3717A696e03e947103FBa3509c256A35F26Ca8E",
         RangeOrders: "0x640834289c9D6846BCB57D02d170AD7D78cfAAa5",
         RangeOrdersResolver: "0x8F946a74e8a54331D5018cDd1Bf64e4230F565ff",
+        TestPool: "0x3965B48bb9815A0E87754fBE313BB39Bb13dC544",
       };
     default:
       throw new Error(`No addresses for Network: ${network}`);

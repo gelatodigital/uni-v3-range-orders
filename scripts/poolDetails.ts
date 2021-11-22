@@ -1,13 +1,15 @@
 import { ethers, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-//import { getAddresses } from "../src/addresses";
+import { getAddresses } from "../src/addresses";
 
 //const addresses = getAddresses(network.name);
 
-const op = async (signer: SignerWithAddress) => {
+const op = async (signer: SignerWithAddress | string) => {
+  const addresses = getAddresses(network.name);
+
   const pool = await ethers.getContractAt(
     "IUniswapV3Pool",
-    "0x3965B48bb9815A0E87754fBE313BB39Bb13dC544",
+    addresses.TestPool,
     signer
   );
 
@@ -26,6 +28,9 @@ const op = async (signer: SignerWithAddress) => {
   if (network.name == "goerli") {
     const [signer] = await ethers.getSigners();
     await op(signer);
+    // } else if (network.name == "arbitrum") {
+    //   const { signer } = await getNamedAccounts();
+    //   await op(signer);
   } else {
     console.log("MUST be network goerli for this script, goodbye.");
   }
