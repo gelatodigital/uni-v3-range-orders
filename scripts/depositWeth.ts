@@ -4,7 +4,7 @@ import { getAddresses } from "../src/addresses";
 
 const addresses = getAddresses(network.name);
 
-const op = async (signer: SignerWithAddress) => {
+const op = async (signer: SignerWithAddress | string) => {
   const weth = await ethers.getContractAt("IWETH9", addresses.WETH, signer);
   const tx = await weth.deposit({ value: ethers.utils.parseEther("5") });
   console.log(tx.hash);
@@ -12,6 +12,13 @@ const op = async (signer: SignerWithAddress) => {
 };
 
 (async () => {
-  const [signer] = await ethers.getSigners();
-  await op(signer);
+  if (network.name == "goerli") {
+    const [signer] = await ethers.getSigners();
+    await op(signer);
+    // } else if (network.name == "arbitrum") {
+    //   const { signer } = await getNamedAccounts();
+    //   await op(signer);
+  } else {
+    console.log("MUST be network goerli for this script, goodbye.");
+  }
 })();

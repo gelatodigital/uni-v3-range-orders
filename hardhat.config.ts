@@ -48,6 +48,7 @@ const config: HardhatUserConfig = {
       accounts: PK_ARBITRUM ? [PK_ARBITRUM] : [],
       chainId: 42161,
       url: `https://arb-mainnet.g.alchemy.com/v2/${ARBITRUM_ALCHEMY_ID}`,
+      gasPrice: parseInt(utils.parseUnits("2", "gwei").toString()),
     },
     mainnet: {
       accounts: PK_MAINNET ? [PK_MAINNET] : [],

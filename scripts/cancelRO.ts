@@ -1,19 +1,18 @@
-import hre, { ethers } from "hardhat";
+import { network, ethers } from "hardhat";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { IUniswapV3Pool, RangeOrder } from "../typechain";
+import { isString } from "util";
+import { getAddresses } from "../src/addresses";
 
-async function main() {
-  if (hre.network.name !== "goerli") {
-    console.log("MUST be network goerli for this script, goodbye.");
-    return;
-  }
-  const [signer] = await ethers.getSigners();
+async function main(signer: SignerWithAddress | string) {
   const rangeOrder = (await ethers.getContract(
     "RangeOrder",
     signer
   )) as RangeOrder;
+  const addresss =  getAddresses(network.name);
   const pool = (await ethers.getContractAt(
     "IUniswapV3Pool",
-    "0x3965B48bb9815A0E87754fBE313BB39Bb13dC544",
+    addresss.TestPool,
     signer
   )) as IUniswapV3Pool;
 
@@ -27,15 +26,20 @@ async function main() {
     tickThreshold: currentTick - (currentTick % 60) - 60,
     amountIn: ethers.utils.parseEther("100"),
     minAmountOut: ethers.utils.parseEther("0.1"),
-    receiver: signer.address,
+    receiver: isString(signer) ? signer : signer.address,
     maxFeeAmount: ethers.constants.MaxUint256,
   });
   console.log("range order tx:", tx.hash);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+(async () => {
+  if (network.name == "goerli") {
+    const [signer] = await ethers.getSigners();
+    await main(signer);
+    // } else if (network.name == "arbitrum") {
+    //   const { signer } = await getNamedAccounts();
+    //   await main(signer);
+  } else {
+    console.log("MUST be network goerli for this script, goodbye.");
+  }
+})();
