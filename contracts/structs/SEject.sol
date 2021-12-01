@@ -10,6 +10,7 @@ struct Order {
     address receiver;
     address owner;
     uint256 maxFeeAmount;
+    uint256 startTime;
 }
 
 struct OrderParams {

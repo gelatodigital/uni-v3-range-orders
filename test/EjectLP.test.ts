@@ -33,6 +33,8 @@ describe("Eject LP Integration Test", function () {
 
   let addresses: Addresses;
 
+  const ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+
   beforeEach("Eject", async function () {
     if (hre.network.name !== "hardhat") {
       console.error("Test Suite is meant to be run on hardhat only");
@@ -130,7 +132,9 @@ describe("Eject LP Integration Test", function () {
 
     await dai.approve(rangeOrder.address, amountIn);
 
-    await rangeOrder.setRangeOrder(
+    const maxFee = ethers.utils.parseEther("0.2");
+
+    const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
@@ -139,10 +143,15 @@ describe("Eject LP Integration Test", function () {
         amountIn: amountIn,
         minAmountOut: minAmountOut,
         receiver,
-        maxFeeAmount: ethers.constants.MaxUint256,
+        maxFeeAmount: maxFee,
       },
-      { from: receiver }
+      { from: receiver, value: ethers.utils.parseEther("0.2") }
     );
+
+    await tx.wait();
+
+    const blockTime = (await hre.ethers.provider.getBlock("latest"))
+      .timestamp;
 
     // End Range Order submission
 
@@ -160,9 +169,10 @@ describe("Eject LP Integration Test", function () {
         amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
-        maxFeeAmount: ethers.constants.MaxUint256,
+        maxFeeAmount: maxFee,
+        startTime: ethers.BigNumber.from(blockTime ?? 0),
       },
-      addresses.WETH
+      ETH
     );
 
     expect(canExec).to.be.false;
@@ -203,9 +213,10 @@ describe("Eject LP Integration Test", function () {
         amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
-        maxFeeAmount: ethers.constants.MaxUint256,
+        maxFeeAmount: maxFee,
+        startTime: ethers.BigNumber.from(blockTime ?? 0),
       },
-      addresses.WETH
+      ETH
     );
 
     expect(canExec).to.be.true;
@@ -223,7 +234,7 @@ describe("Eject LP Integration Test", function () {
 
     await pokeMe.connect(gelato).exec(
       0,
-      addresses.WETH,
+      ETH,
       ejectPL.address,
       false,
       await pokeMe.getResolverHash(
@@ -238,9 +249,10 @@ describe("Eject LP Integration Test", function () {
             amount1Min: minAmountOut,
             receiver,
             owner: rangeOrder.address,
-            maxFeeAmount: ethers.constants.MaxUint256,
+            maxFeeAmount: maxFee,
+            startTime: ethers.BigNumber.from(blockTime ?? 0),
           },
-          addresses.WETH,
+          ETH,
         ])
       ),
       ejectPL.address,
@@ -259,6 +271,8 @@ describe("Eject LP Integration Test", function () {
 
   it("#1: Submit a Range Order", async () => {
     // Swap DAI to WETH
+
+    const maxFee = ethers.utils.parseEther("0.2");
 
     await swapRouter.exactOutputSingle(
       {
@@ -320,9 +334,9 @@ describe("Eject LP Integration Test", function () {
         amountIn: amountIn,
         minAmountOut: minAmountOut,
         receiver,
-        maxFeeAmount: ethers.constants.MaxUint256,
+        maxFeeAmount: maxFee,
       },
-      { from: receiver }
+      { from: receiver, value: maxFee }
     );
 
     // End Range Order submission
@@ -330,6 +344,8 @@ describe("Eject LP Integration Test", function () {
 
   it("#2: Cancel Range Order", async () => {
     // Swap DAI to WETH
+
+    const maxFee = ethers.utils.parseEther("0.2");
 
     await swapRouter.exactOutputSingle(
       {
@@ -385,7 +401,7 @@ describe("Eject LP Integration Test", function () {
 
     expect(await dai.balanceOf(receiver)).to.be.eq(amountIn);
 
-    await rangeOrder.setRangeOrder(
+    const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
@@ -394,10 +410,14 @@ describe("Eject LP Integration Test", function () {
         amountIn: amountIn,
         minAmountOut: minAmountOut,
         receiver,
-        maxFeeAmount: ethers.constants.MaxUint256,
+        maxFeeAmount: maxFee,
       },
-      { from: receiver }
+      { from: receiver, value: maxFee }
     );
+
+    await tx.wait();
+
+    const blockTime = (await hre.ethers.provider.getBlock("latest")).timestamp;
 
     // End Range Order submission
 
@@ -405,16 +425,20 @@ describe("Eject LP Integration Test", function () {
 
     // Start Cancel Range Order
 
-    await rangeOrder.cancelRangeOrder(145227, {
-      pool: pool.address,
-      zeroForOne: true,
-      ejectDust: true,
-      tickThreshold,
-      amountIn: amountIn,
-      minAmountOut: minAmountOut,
-      receiver,
-      maxFeeAmount: ethers.constants.MaxUint256,
-    });
+    await rangeOrder.cancelRangeOrder(
+      145227,
+      {
+        pool: pool.address,
+        zeroForOne: true,
+        ejectDust: true,
+        tickThreshold,
+        amountIn: amountIn,
+        minAmountOut: minAmountOut,
+        receiver,
+        maxFeeAmount: maxFee,
+      },
+      blockTime
+    );
 
     // End Cancel Range Order
 
