@@ -17,14 +17,23 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   }
 
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const { deployer, gelatoMultiSig } = await getNamedAccounts();
   const addresses = getAddresses(hre.network.name);
   await deploy("EjectLP", {
     from: deployer,
+    proxy: {
+      owner: gelatoMultiSig,
+      execute: {
+        init: {
+          methodName: "initialize",
+          args: [],
+        },
+      },
+    },
     args: [
       addresses.NonfungiblePositionManager,
-      addresses.UniswapV3Factory,
       addresses.PokeMe,
+      addresses.UniswapV3Factory,
       addresses.Gelato,
     ],
     log: hre.network.name != "hardhat" ? true : false,

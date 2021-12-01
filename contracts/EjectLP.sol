@@ -16,21 +16,55 @@ import {
     INonfungiblePositionManager,
     PoolAddress
 } from "./vendor/INonfungiblePositionManager.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Proxied} from "./vendor/hardhat-deploy/Proxied.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {
+    AddressUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
+import {ETH} from "./constants/CEjectLP.sol";
 
-contract EjectLP is IEjectLP {
+// BE CAREFUL: DOT NOT CHANGE THE ORDER OF INHERITED CONTRACT
+contract EjectLP is
+    Initializable,
+    Proxied,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    IEjectLP
+{
     using SafeERC20 for IERC20;
 
+    // solhint-disable-next-line max-line-length
+    ////////////////////////////////////////// CONSTANTS AND IMMUTABLES ///////////////////////////////////
+
     INonfungiblePositionManager public immutable override nftPositions;
-    address internal immutable _factory;
     IPokeMe public immutable override pokeMe;
+    address internal immutable _factory;
     address internal immutable _gelato;
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! DO NOT CHANGE ORDER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     mapping(uint256 => bytes32) public hashById;
     mapping(uint256 => bytes32) public taskById;
+
+    uint256 public duration;
+    uint256 public minimumFee;
+    // HERE YOU CAN ADD PROPERTIES!!!
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! EVENTS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     event LogSetEject(
         uint256 indexed tokenId,
         OrderParams orderParams,
+        uint256 startTime,
         address sender
     );
     event LogEject(
@@ -41,16 +75,13 @@ contract EjectLP is IEjectLP {
     );
     event LogCancelEject(uint256 indexed tokenId);
 
+    // !!!!!!!!!!!!!!!!!!!!!!!! MODIFIERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     modifier onlyPokeMe() {
         require(
             msg.sender == address(pokeMe),
             "EjectLP::onlyPokeMe: only pokeMe"
         );
-        _;
-    }
-
-    modifier onlyGelato() {
-        require(msg.sender == _gelato, "EjectLP::onlyPokeMe: only gelato");
         _;
     }
 
@@ -72,8 +103,8 @@ contract EjectLP is IEjectLP {
 
     constructor(
         INonfungiblePositionManager nftPositions_,
-        address factory_,
         IPokeMe pokeMe_,
+        address factory_,
         address gelato_
     ) {
         nftPositions = nftPositions_;
@@ -82,12 +113,72 @@ contract EjectLP is IEjectLP {
         _gelato = gelato_;
     }
 
+    function initialize() external initializer {
+        __ReentrancyGuard_init();
+        __Pausable_init();
+
+        duration = 7776000; /// @custom:duration period when the range order will be actif.
+        minimumFee = 1000000000; /// @custom:minimumFee minimum equal to 1 Gwei.
+    }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! ADMIN FUNCTIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    function pause() external onlyProxyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyProxyAdmin {
+        _unpause();
+    }
+
+    function setDuration(uint256 duration_) external onlyProxyAdmin {
+        duration = duration_;
+    }
+
+    function setMinimumFee(uint256 minimumFee_) external onlyProxyAdmin {
+        minimumFee = minimumFee_;
+    }
+
+    function mulipleRetrieveDust(address[] calldata tokens_, address recipient_)
+        external
+        onlyProxyAdmin
+    {
+        for (uint256 i = 0; i < tokens_.length; i++) {
+            retrieveDust(tokens_[i], recipient_);
+        }
+    }
+
+    function retrieveDust(address token_, address recipient_)
+        public
+        onlyProxyAdmin
+    {
+        IERC20 token = IERC20(token_);
+        uint256 balance = token.balanceOf(address(this));
+
+        if (balance > 0) token.safeTransfer(recipient_, balance);
+    }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! EXTERNAL FUNCTIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     function schedule(OrderParams memory orderParams_)
         external
+        payable
         override
+        whenNotPaused
+        nonReentrant
         isApproved(orderParams_.tokenId)
         onlyPositionOwner(orderParams_.tokenId, msg.sender)
     {
+        require(
+            orderParams_.maxFeeAmount > minimumFee,
+            "EjectLP::schedule: maxFeeAmount < minimumFee"
+        );
+
+        require(
+            orderParams_.maxFeeAmount == msg.value,
+            "EjectLP::schedule: maxFeeAmount !== msg.value"
+        );
+
         Order memory order = Order({
             tickThreshold: orderParams_.tickThreshold,
             ejectAbove: orderParams_.ejectAbove,
@@ -96,7 +187,8 @@ contract EjectLP is IEjectLP {
             amount1Min: orderParams_.amount1Min,
             receiver: orderParams_.receiver,
             owner: msg.sender,
-            maxFeeAmount: orderParams_.maxFeeAmount
+            maxFeeAmount: orderParams_.maxFeeAmount,
+            startTime: block.timestamp
         });
 
         hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
@@ -113,19 +205,26 @@ contract EjectLP is IEjectLP {
             orderParams_.feeToken
         );
 
-        emit LogSetEject(orderParams_.tokenId, orderParams_, msg.sender);
+        emit LogSetEject(
+            orderParams_.tokenId,
+            orderParams_,
+            block.timestamp,
+            msg.sender
+        );
     }
 
     // solhint-disable-next-line function-max-lines
     function eject(uint256 tokenId_, Order memory order_)
         external
         override
+        whenNotPaused
+        nonReentrant
         onlyPokeMe
     {
         (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
 
         require(
-            feeAmount < order_.maxFeeAmount,
+            feeAmount <= order_.maxFeeAmount,
             "EjectLP::eject: fee > maxFeeAmount"
         );
 
@@ -137,11 +236,6 @@ contract EjectLP is IEjectLP {
 
         (uint256 amount0, uint256 amount1) = _collect(tokenId_, liquidity);
 
-        if (feeToken == token0) {
-            amount0 -= feeAmount;
-        } else {
-            amount1 -= feeAmount;
-        }
         require(
             amount0 >= order_.amount0Min && amount1 >= order_.amount1Min,
             "EjectLP::eject: received below minimum"
@@ -160,8 +254,13 @@ contract EjectLP is IEjectLP {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
-        // gelato fee
-        IERC20(feeToken).safeTransfer(_gelato, feeAmount);
+        // gelato fee in native token
+        AddressUpgradeable.sendValue(payable(_gelato), feeAmount);
+        if (feeAmount < order_.maxFeeAmount)
+            AddressUpgradeable.sendValue(
+                payable(order_.receiver),
+                order_.maxFeeAmount - feeAmount
+            );
 
         emit LogEject(tokenId_, amount0, amount1, feeAmount);
     }
@@ -170,6 +269,8 @@ contract EjectLP is IEjectLP {
     function cancel(uint256 tokenId_, Order memory order_)
         external
         override
+        whenNotPaused
+        nonReentrant
         isApproved(tokenId_)
         onlyPositionOwner(tokenId_, msg.sender)
     {
@@ -215,26 +316,12 @@ contract EjectLP is IEjectLP {
             IERC20(token1).safeTransfer(order_.receiver, amount1);
         }
 
+        AddressUpgradeable.sendValue(
+            payable(order_.receiver),
+            order_.maxFeeAmount
+        );
+
         emit LogCancelEject(tokenId_);
-    }
-
-    function mulipleRetrieveDust(address[] calldata tokens_, address recipient_)
-        external
-        onlyGelato
-    {
-        for (uint256 i = 0; i < tokens_.length; i++) {
-            retrieveDust(tokens_[i], recipient_);
-        }
-    }
-
-    function retrieveDust(address token_, address recipient_)
-        public
-        onlyGelato
-    {
-        IERC20 token = IERC20(token_);
-        uint256 balance = token.balanceOf(address(this));
-
-        if (balance > 0) token.safeTransfer(recipient_, balance);
     }
 
     // solhint-disable-next-line function-max-lines
@@ -258,6 +345,10 @@ contract EjectLP is IEjectLP {
             hashById[tokenId_] == keccak256(abi.encode(order_)),
             "EjectLP::canEject: incorrect task hash"
         );
+        require(
+            order_.startTime + duration > block.timestamp,
+            "EjectLP::canEject: range order expired."
+        );
         address token0;
         address token1;
         uint128 liquidity;
@@ -268,10 +359,7 @@ contract EjectLP is IEjectLP {
                 .positions(tokenId_);
             pool = _pool(token0, token1, feeTier);
         }
-        require(
-            feeToken_ == token0 || feeToken_ == token1,
-            "EjectLP::canEject: wrong fee token"
-        );
+        require(feeToken_ == ETH, "EjectLP::canEject: only native token");
 
         {
             (, int24 tick, , , , , ) = pool.slot0();

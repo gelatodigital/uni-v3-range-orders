@@ -17,10 +17,19 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   }
 
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  const { deployer, gelatoMultiSig } = await getNamedAccounts();
   const addresses = getAddresses(hre.network.name);
   await deploy("RangeOrder", {
     from: deployer,
+    proxy: {
+      owner: gelatoMultiSig,
+      execute: {
+        init: {
+          methodName: "initialize",
+          args: [],
+        },
+      },
+    },
     args: [
       (await ethers.getContract("EjectLP")).address,
       addresses.WETH,

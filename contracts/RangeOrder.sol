@@ -5,26 +5,49 @@ import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {
-    INonfungiblePositionManager
-} from "./vendor/INonfungiblePositionManager.sol";
-import {
     IERC721Receiver
 } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {
+    INonfungiblePositionManager
+} from "./vendor/INonfungiblePositionManager.sol";
 import {IWETH9} from "./vendor/IWETH9.sol";
 import {IEjectLP} from "./IEjectLP.sol";
 import {
     IERC20,
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Proxied} from "./vendor/hardhat-deploy/Proxied.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 import {RangeOrderParams} from "./structs/SRangeOrder.sol";
+import {ETH} from "./constants/CEjectLP.sol";
 
-contract RangeOrder is IERC721Receiver {
+// BE CAREFUL: DOT NOT CHANGE THE ORDER OF INHERITED CONTRACT
+contract RangeOrder is
+    Initializable,
+    Proxied,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    IERC721Receiver
+{
     using SafeERC20 for IERC20;
+
+    // solhint-disable-next-line max-line-length
+    ////////////////////////////////////////// CONSTANTS AND IMMUTABLES ///////////////////////////////////
 
     IEjectLP public immutable eject;
     IWETH9 public immutable WETH9; // solhint-disable-line var-name-mixedcase
     address public immutable rangeOrderResolver;
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! EVENTS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     event LogSetRangeOrder(
         uint256 indexed tokenId,
@@ -43,8 +66,28 @@ contract RangeOrder is IERC721Receiver {
         rangeOrderResolver = rangeOrderResolver_;
     }
 
+    function initialize() external initializer {
+        __ReentrancyGuard_init();
+        __Pausable_init();
+    }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!! ADMIN FUNCTIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    function pause() external onlyProxyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyProxyAdmin {
+        _unpause();
+    }
+
     // solhint-disable-next-line function-max-lines
-    function setRangeOrder(RangeOrderParams calldata params_) external payable {
+    function setRangeOrder(RangeOrderParams calldata params_)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+    {
         uint256 tokenId;
         address token0;
         address token1;
@@ -79,23 +122,30 @@ contract RangeOrder is IERC721Receiver {
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
-                if (msg.value > 0) {
+                if (address(tokenIn) == address(WETH9)) {
                     require(
-                        msg.value == params_.amountIn,
+                        msg.value > params_.amountIn,
                         "RangeOrder:setRangeOrder:: Invalid amount in."
                     );
+
                     require(
-                        address(tokenIn) == address(WETH9),
-                        "RangeOrder:setRangeOrder:: ETH range order should use WETH token."
+                        msg.value - params_.amountIn == params_.maxFeeAmount,
+                        "RangeOrder:setRangeOrder:: Invalid maxFeeAmount."
                     );
 
-                    WETH9.deposit{value: msg.value}();
-                } else
+                    WETH9.deposit{value: params_.amountIn}();
+                } else {
+                    require(
+                        msg.value == params_.maxFeeAmount,
+                        "RangeOrder:setRangeOrder:: Invalid maxFeeAmount."
+                    );
+
                     tokenIn.safeTransferFrom(
                         msg.sender,
                         address(this),
                         params_.amountIn
                     );
+                }
 
                 tokenIn.safeApprove(address(positions), params_.amountIn);
             }
@@ -116,7 +166,7 @@ contract RangeOrder is IERC721Receiver {
                 })
             );
             positions.approve(address(eject), tokenId);
-            eject.schedule(
+            eject.schedule{value: params_.maxFeeAmount}(
                 OrderParams({
                     tokenId: tokenId,
                     tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
@@ -125,7 +175,7 @@ contract RangeOrder is IERC721Receiver {
                     amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
                     amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                     receiver: params_.receiver,
-                    feeToken: params_.zeroForOne ? token1 : token0,
+                    feeToken: ETH,
                     resolver: rangeOrderResolver,
                     maxFeeAmount: params_.maxFeeAmount
                 })
@@ -137,8 +187,9 @@ contract RangeOrder is IERC721Receiver {
 
     function cancelRangeOrder(
         uint256 tokenId_,
-        RangeOrderParams calldata params_
-    ) external {
+        RangeOrderParams calldata params_,
+        uint256 startTime_
+    ) external whenNotPaused nonReentrant {
         require(
             params_.receiver == msg.sender,
             "RangeOrder::cancelRangeOrder: only receiver."
@@ -164,7 +215,8 @@ contract RangeOrder is IERC721Receiver {
                 amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                 receiver: params_.receiver,
                 owner: address(this),
-                maxFeeAmount: params_.maxFeeAmount
+                maxFeeAmount: params_.maxFeeAmount,
+                startTime: startTime_
             })
         );
     }

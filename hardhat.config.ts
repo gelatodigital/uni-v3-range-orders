@@ -26,6 +26,10 @@ const config: HardhatUserConfig = {
     deployer: {
       default: 0,
     },
+    gelatoMultiSig: {
+      arbitrum: "0xa2BC74F8C81b46BADbD8C20bF9Bd31DAd2CEDba8",
+      mainnet: "0xeD5cF41b0fD6A3C564c17eE34d9D26Eafc30619b",
+    },
   },
 
   networks: {
