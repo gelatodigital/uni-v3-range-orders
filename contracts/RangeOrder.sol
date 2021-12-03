@@ -111,7 +111,7 @@ contract RangeOrder is
                     : params_.tickThreshold;
             }
 
-            _requireThresholdNotInRange(params_.pool, lowerTick, upperTick, params_.zeroForOne);
+            _requireOrderUnfilled(params_.pool, lowerTick, upperTick, params_.zeroForOne);
 
             token0 = params_.pool.token0();
             token1 = params_.pool.token1();
@@ -203,6 +203,7 @@ contract RangeOrder is
         int24 upperTick = params_.zeroForOne
             ? params_.tickThreshold + tickSpacing
             : params_.tickThreshold;
+        _requireOrderUnfilled(params_.pool, lowerTick, upperTick, params_.zeroForOne);
 
         eject.cancel(
             tokenId_,
@@ -229,7 +230,7 @@ contract RangeOrder is
         return IERC721Receiver.onERC721Received.selector;
     }
 
-    function _requireThresholdNotInRange(
+    function _requireOrderUnfilled(
         IUniswapV3Pool pool_,
         int24 lowerTick_,
         int24 upperTick_,
