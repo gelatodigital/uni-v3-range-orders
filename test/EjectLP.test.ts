@@ -150,8 +150,7 @@ describe("Eject LP Integration Test", function () {
 
     await tx.wait();
 
-    const blockTime = (await hre.ethers.provider.getBlock("latest"))
-      .timestamp;
+    const blockTime = (await hre.ethers.provider.getBlock("latest")).timestamp;
 
     // End Range Order submission
 
