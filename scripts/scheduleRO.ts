@@ -35,16 +35,17 @@ const op = async (signer: SignerWithAddress | string) => {
   console.log("Pool Address : ", pool.address);
   console.log("Signer Address : ", signer);
 
-  const tx = await rangeOrder.setRangeOrder({
-    pool: pool.address ?? addresss.TestPool, // uniswap v3 pool address
-    zeroForOne: false,
-    ejectDust: false,
-    tickThreshold: currentTick - (currentTick % tickSpacing) - tickSpacing,
-    amountIn: ethers.utils.parseUnits("400", 18),
-    minAmountOut: ethers.utils.parseEther("0.09"),
-    receiver: isString(signer) ? signer : signer.address,
-    maxFeeAmount: ethers.utils.parseEther("0.005"),
-  });
+  const tx = await rangeOrder.setRangeOrder(
+    {
+      pool: pool.address ?? addresss.TestPool, // uniswap v3 pool address
+      zeroForOne: false,
+      tickThreshold: currentTick - (currentTick % tickSpacing) - tickSpacing,
+      amountIn: ethers.utils.parseUnits("400", 18),
+      receiver: isString(signer) ? signer : signer.address,
+      maxFeeAmount: ethers.utils.parseEther("0.005"),
+    },
+    { value: ethers.utils.parseEther("0.005") }
+  );
   console.log("range order tx:", tx.hash);
 };
 

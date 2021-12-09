@@ -101,10 +101,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -156,10 +154,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -185,20 +181,11 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
-    const minAmountOut = ethers.utils.parseEther("10");
-
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
 
     const amountIn = ethers.utils.parseEther("42000");
 
     const receiver = await user.getAddress();
-
-    // // Start Approve WETH token
-
-    await weth.approve(rangeOrder.address, minAmountOut);
-    await weth.approve(pool.address, minAmountOut);
-
-    // // End Approve WETH token
 
     // Start Range Order submission
 
@@ -211,10 +198,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -242,20 +227,9 @@ describe("Submission Eject LP Tests", function () {
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) - tickSpacing;
 
-    const minAmountOut = ethers.utils.parseEther("42000");
-
     const receiver = await user.getAddress();
 
-    // // Start Approve WETH token
-
-    await weth.approve(rangeOrder.address, minAmountOut);
-    await weth.approve(pool.address, minAmountOut);
-
-    // // End Approve WETH token
-
     // Start Range Order submission
-
-    await dai.approve(rangeOrder.address, amountIn);
 
     const maxFee = ethers.utils.parseEther("0.2");
 
@@ -264,14 +238,12 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: false,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
-        { from: receiver, value: ethers.utils.parseEther("0.2") }
+        { from: receiver, value: maxFee.add(1) }
       )
     ).to.be.revertedWith("RangeOrder:setRangeOrder:: Invalid amount in.");
   });
@@ -295,20 +267,7 @@ describe("Submission Eject LP Tests", function () {
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) - tickSpacing;
 
-    const minAmountOut = ethers.utils.parseEther("42000");
-
     const receiver = await user.getAddress();
-
-    // // Start Approve WETH token
-
-    await weth.approve(rangeOrder.address, minAmountOut);
-    await weth.approve(pool.address, minAmountOut);
-
-    // // End Approve WETH token
-
-    // Start Range Order submission
-
-    await dai.approve(rangeOrder.address, amountIn);
 
     const maxFee = ethers.utils.parseEther("0.2");
 
@@ -317,10 +276,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: false,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -388,10 +345,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -459,10 +414,8 @@ describe("Submission Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
