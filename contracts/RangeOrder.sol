@@ -29,6 +29,7 @@ import {
 import {Order, OrderParams} from "./structs/SEject.sol";
 import {RangeOrderParams} from "./structs/SRangeOrder.sol";
 import {ETH} from "./constants/CEjectLP.sol";
+import {_collect} from "./functions/FEjectLp.sol";
 
 // BE CAREFUL: DOT NOT CHANGE THE ORDER OF INHERITED CONTRACT
 contract RangeOrder is
@@ -53,6 +54,12 @@ contract RangeOrder is
         uint256 indexed tokenId,
         address pool,
         uint256 amountIn
+    );
+
+    event LogCancelRangeOrder(
+        uint256 indexed tokenId,
+        uint256 amount0,
+        uint256 amount1
     );
 
     // solhint-disable-next-line var-name-mixedcase, func-param-name-mixedcase
@@ -89,8 +96,6 @@ contract RangeOrder is
         nonReentrant
     {
         uint256 tokenId;
-        address token0;
-        address token1;
         uint24 fee;
         {
             int24 lowerTick;
@@ -113,8 +118,8 @@ contract RangeOrder is
 
             _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
 
-            token0 = params_.pool.token0();
-            token1 = params_.pool.token1();
+            address token0 = params_.pool.token0();
+            address token1 = params_.pool.token1();
             fee = params_.pool.fee();
 
             INonfungiblePositionManager positions = eject.nftPositions();
@@ -122,7 +127,7 @@ contract RangeOrder is
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
-                if (address(tokenIn) == address(WETH9)) {
+                if (address(tokenIn) == address(WETH9) && msg.value > params_.maxFeeAmount) {
                     require(
                         msg.value > params_.amountIn,
                         "RangeOrder:setRangeOrder:: Invalid amount in."
@@ -171,9 +176,6 @@ contract RangeOrder is
                     tokenId: tokenId,
                     tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
                     ejectAbove: params_.zeroForOne,
-                    ejectDust: params_.ejectDust,
-                    amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
-                    amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                     receiver: params_.receiver,
                     feeToken: ETH,
                     resolver: rangeOrderResolver,
@@ -210,15 +212,29 @@ contract RangeOrder is
             Order({
                 tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
                 ejectAbove: params_.zeroForOne,
-                ejectDust: params_.ejectDust,
-                amount0Min: params_.zeroForOne ? 0 : params_.minAmountOut,
-                amount1Min: params_.zeroForOne ? params_.minAmountOut : 0,
                 receiver: params_.receiver,
                 owner: address(this),
                 maxFeeAmount: params_.maxFeeAmount,
                 startTime: startTime_
             })
         );
+
+        INonfungiblePositionManager positions = eject.nftPositions();
+
+        (, , , , , , , uint128 liquidity, , , , ) = positions.positions(
+            tokenId_
+        );
+
+        positions.approve(params_.receiver, tokenId_); // remove approval to EjectLP.
+
+        (uint256 amount0, uint256 amount1) = _collect(
+            positions,
+            tokenId_,
+            liquidity,
+            params_.receiver
+        );
+
+        emit LogCancelRangeOrder(tokenId_, amount0, amount1);
     }
 
     function onERC721Received(

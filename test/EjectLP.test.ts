@@ -138,10 +138,8 @@ describe("Eject LP Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -163,9 +161,6 @@ describe("Eject LP Integration Test", function () {
       {
         tickThreshold,
         ejectAbove: true,
-        ejectDust: true,
-        amount0Min: 0,
-        amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
@@ -207,9 +202,6 @@ describe("Eject LP Integration Test", function () {
       {
         tickThreshold,
         ejectAbove: true,
-        ejectDust: true,
-        amount0Min: 0,
-        amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
@@ -243,9 +235,6 @@ describe("Eject LP Integration Test", function () {
           {
             tickThreshold,
             ejectAbove: true,
-            ejectDust: true,
-            amount0Min: 0,
-            amount1Min: minAmountOut,
             receiver,
             owner: rangeOrder.address,
             maxFeeAmount: maxFee,
@@ -268,7 +257,183 @@ describe("Eject LP Integration Test", function () {
     expect(await weth.balanceOf(receiver)).to.be.gt(minAmountOut);
   });
 
-  it("#1: Submit a Range Order", async () => {
+  it("#1: Settle a Range Order", async () => {
+    // Swap DAI to WETH
+
+    await swapRouter.exactOutputSingle(
+      {
+        tokenIn: addresses.WETH,
+        tokenOut: addresses.DAI,
+        fee: 500,
+        recipient: await user.getAddress(),
+        deadline: ethers.constants.MaxUint256,
+        amountOut: ethers.utils.parseEther("42000"),
+        amountInMaximum: ethers.utils.parseEther("11"),
+        sqrtPriceLimitX96: ethers.constants.Zero,
+      },
+      {
+        value: ethers.utils.parseEther("11"),
+      }
+    );
+
+    // we will do a range order to swap DAI to WETH
+
+    const poolAddress = await factory.getPool(
+      addresses.DAI,
+      addresses.WETH,
+      500
+    );
+    const pool = (await ethers.getContractAt(
+      "IUniswapV3Pool",
+      poolAddress,
+      user
+    )) as IUniswapV3Pool;
+
+    const slot0 = await pool.slot0();
+    const tickSpacing = await pool.tickSpacing();
+
+    const minAmountOut = ethers.utils.parseEther("10");
+
+    const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
+
+    const amountIn = ethers.utils.parseEther("42000");
+
+    const receiver = await user.getAddress();
+
+    // // Start Approve WETH token
+
+    await weth.approve(rangeOrder.address, minAmountOut);
+    await weth.approve(pool.address, minAmountOut);
+
+    // // End Approve WETH token
+
+    // Start Range Order submission
+
+    await dai.approve(rangeOrder.address, amountIn);
+
+    const maxFee = ethers.utils.parseEther("0.2");
+
+    const tx = await rangeOrder.setRangeOrder(
+      {
+        pool: pool.address,
+        zeroForOne: true,
+        tickThreshold,
+        amountIn: amountIn,
+        receiver,
+        maxFeeAmount: maxFee,
+      },
+      { from: receiver, value: ethers.utils.parseEther("0.2") }
+    );
+
+    await tx.wait();
+
+    const blockTime = (await hre.ethers.provider.getBlock("latest")).timestamp;
+
+    // End Range Order submission
+
+    const tokenId = 145227; // change if the fork block number change.
+
+    // Start Check can eject
+
+    let [canExec] = await rangeOrderResolver.checker(
+      tokenId,
+      {
+        tickThreshold,
+        ejectAbove: true,
+        receiver,
+        owner: rangeOrder.address,
+        maxFeeAmount: maxFee,
+        startTime: ethers.BigNumber.from(blockTime ?? 0),
+      },
+      ETH
+    );
+
+    expect(canExec).to.be.false;
+
+    // End Check can eject
+
+    // Jump into the futur.
+
+    await hre.network.provider.send("evm_increaseTime", [7776001]);
+    await hre.network.provider.send("evm_mine");
+
+    // Jump into the futur.
+
+    // Start re Check can eject
+
+    let data;
+
+    [canExec, data] = await rangeOrderResolver.checker(
+      tokenId,
+      {
+        tickThreshold,
+        ejectAbove: true,
+        receiver,
+        owner: rangeOrder.address,
+        maxFeeAmount: maxFee,
+        startTime: ethers.BigNumber.from(blockTime ?? 0),
+      },
+      ETH
+    );
+
+    expect(canExec).to.be.true;
+
+    // End re Check can eject
+
+    // Eject Position
+
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [addresses.Gelato],
+    });
+
+    const gelato = await ethers.getSigner(addresses.Gelato);
+
+    const ethBalanceBefore = await user.getBalance();
+    const daiBalanceBefore = await dai.balanceOf(receiver);
+
+    await pokeMe.connect(gelato).exec(
+      0,
+      ETH,
+      ejectPL.address,
+      false,
+      await pokeMe.getResolverHash(
+        rangeOrderResolver.address,
+        rangeOrderResolver.interface.encodeFunctionData("checker", [
+          tokenId,
+          {
+            tickThreshold,
+            ejectAbove: true,
+            receiver,
+            owner: rangeOrder.address,
+            maxFeeAmount: maxFee,
+            startTime: ethers.BigNumber.from(blockTime ?? 0),
+          },
+          ETH,
+        ])
+      ),
+      ejectPL.address,
+      data
+    );
+
+    const ethBalanceAfter = await user.getBalance();
+    const daiBalanceAfter = await dai.balanceOf(receiver);
+
+    await hre.network.provider.request({
+      method: "hardhat_stopImpersonatingAccount",
+      params: [addresses.Gelato],
+    });
+
+    // Eject Position
+
+    expect(ethBalanceAfter.sub(ethBalanceBefore)).to.be.gt(
+      ethers.constants.Zero
+    );
+
+    expect(daiBalanceAfter.sub(daiBalanceBefore).sub(amountIn)).to.be.lte(1);
+  });
+
+  it("#2: Submit a Range Order", async () => {
     // Swap DAI to WETH
 
     const maxFee = ethers.utils.parseEther("0.2");
@@ -328,10 +493,8 @@ describe("Eject LP Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -341,7 +504,7 @@ describe("Eject LP Integration Test", function () {
     // End Range Order submission
   });
 
-  it("#2: Cancel Range Order", async () => {
+  it("#3: Cancel Range Order", async () => {
     // Swap DAI to WETH
 
     const maxFee = ethers.utils.parseEther("0.2");
@@ -404,10 +567,8 @@ describe("Eject LP Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -429,10 +590,8 @@ describe("Eject LP Integration Test", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
