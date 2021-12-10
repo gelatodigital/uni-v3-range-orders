@@ -33,7 +33,6 @@ describe("Cancel Eject LP Tests", function () {
   let maxFee: BigNumber;
   let submissionBlockTime: number;
   let tickThreshold: number;
-  let minAmountOut: BigNumber;
   let amountIn: BigNumber;
   let receiver: string;
 
@@ -119,7 +118,6 @@ describe("Cancel Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
-    minAmountOut = ethers.utils.parseEther("10");
 
     tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
 
@@ -129,8 +127,8 @@ describe("Cancel Eject LP Tests", function () {
 
     // // Start Approve WETH token
 
-    await weth.approve(rangeOrder.address, minAmountOut);
-    await weth.approve(pool.address, minAmountOut);
+    // await weth.approve(rangeOrder.address, minAmountOut);
+    // await weth.approve(pool.address, minAmountOut);
 
     // // End Approve WETH token
 
@@ -144,10 +142,8 @@ describe("Cancel Eject LP Tests", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -170,10 +166,8 @@ describe("Cancel Eject LP Tests", function () {
       {
         pool: pool.address,
         zeroForOne: true,
-        ejectDust: true,
         tickThreshold,
         amountIn: amountIn,
-        minAmountOut: minAmountOut,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -198,10 +192,8 @@ describe("Cancel Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -217,10 +209,8 @@ describe("Cancel Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee.add(1),
         },
@@ -235,9 +225,6 @@ describe("Cancel Eject LP Tests", function () {
       {
         tickThreshold,
         ejectAbove: true,
-        ejectDust: true,
-        amount0Min: 0,
-        amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
@@ -279,9 +266,6 @@ describe("Cancel Eject LP Tests", function () {
       {
         tickThreshold,
         ejectAbove: true,
-        ejectDust: true,
-        amount0Min: 0,
-        amount1Min: minAmountOut,
         receiver,
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
@@ -302,10 +286,8 @@ describe("Cancel Eject LP Tests", function () {
         {
           pool: pool.address,
           zeroForOne: true,
-          ejectDust: true,
           tickThreshold,
           amountIn: amountIn,
-          minAmountOut: minAmountOut,
           receiver,
           maxFeeAmount: maxFee,
         },
