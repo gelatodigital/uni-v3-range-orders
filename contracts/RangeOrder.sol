@@ -127,7 +127,10 @@ contract RangeOrder is
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
-                if (address(tokenIn) == address(WETH9) && msg.value > params_.maxFeeAmount) {
+                if (
+                    address(tokenIn) == address(WETH9) &&
+                    msg.value > params_.maxFeeAmount
+                ) {
                     require(
                         msg.value > params_.amountIn,
                         "RangeOrder:setRangeOrder:: Invalid amount in."
@@ -187,6 +190,7 @@ contract RangeOrder is
         emit LogSetRangeOrder(tokenId, address(params_.pool), params_.amountIn);
     }
 
+    // solhint-disable-next-line function-max-lines
     function cancelRangeOrder(
         uint256 tokenId_,
         RangeOrderParams calldata params_,
