@@ -5,7 +5,6 @@ import {
   EjectLP,
   IERC20,
   IPokeMe,
-  IUniswapV3Factory,
   IUniswapV3Pool,
   RangeOrder,
   RangeOrderResolver,
@@ -13,6 +12,7 @@ import {
 import { Addresses, getAddresses } from "../src/addresses";
 import { ISwapRouter } from "../typechain/ISwapRouter";
 import { IWETH9 } from "../typechain/IWETH9";
+import { Contract } from "ethers";
 
 const { ethers, deployments } = hre;
 
@@ -24,7 +24,7 @@ describe("Eject LP Integration Test", function () {
   let ejectPL: EjectLP;
   let rangeOrder: RangeOrder;
   let rangeOrderResolver: RangeOrderResolver;
-  let factory: IUniswapV3Factory;
+  let factory: Contract;
   let swapRouter: ISwapRouter;
   let pokeMe: IPokeMe;
 
@@ -51,11 +51,13 @@ describe("Eject LP Integration Test", function () {
     rangeOrderResolver = (await ethers.getContract(
       "RangeOrderResolver"
     )) as RangeOrderResolver;
-    factory = (await ethers.getContractAt(
-      "IUniswapV3Factory",
+    factory = await ethers.getContractAt(
+      [
+        "function getPool(address tokenA,address tokenB,uint24 fee) view returns (address pool)",
+      ],
       addresses.UniswapV3Factory,
       user
-    )) as IUniswapV3Factory;
+    );
 
     weth = (await ethers.getContractAt(
       "IWETH9",
@@ -197,6 +199,7 @@ describe("Eject LP Integration Test", function () {
 
     let data;
 
+    // eslint-disable-next-line prefer-const
     [canExec, data] = await rangeOrderResolver.checker(
       tokenId,
       {
@@ -363,6 +366,7 @@ describe("Eject LP Integration Test", function () {
 
     let data;
 
+    // eslint-disable-next-line prefer-const
     [canExec, data] = await rangeOrderResolver.checker(
       tokenId,
       {

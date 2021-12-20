@@ -2,18 +2,17 @@ import { expect } from "chai";
 import { Signer } from "@ethersproject/abstract-signer";
 import hre = require("hardhat");
 import {
-  EjectLP,
   IERC20,
-  IPokeMe,
-  IUniswapV3Factory,
+  // IPokeMe,
   IUniswapV3Pool,
   RangeOrder,
   RangeOrderResolver,
 } from "../typechain";
 import { Addresses, getAddresses } from "../src/addresses";
 import { ISwapRouter } from "../typechain/ISwapRouter";
-import { IWETH9 } from "../typechain/IWETH9";
+// import { IWETH9 } from "../typechain/IWETH9";
 import { BigNumber } from "@ethersproject/bignumber";
+import { Contract } from "ethers";
 
 const { ethers, deployments } = hre;
 
@@ -22,12 +21,11 @@ describe("Cancel Eject LP Tests", function () {
 
   let user: Signer;
   let user2: Signer;
-  let ejectPL: EjectLP;
   let rangeOrder: RangeOrder;
   let rangeOrderResolver: RangeOrderResolver;
-  let factory: IUniswapV3Factory;
+  let factory: Contract;
   let swapRouter: ISwapRouter;
-  let pokeMe: IPokeMe;
+  // let pokeMe: IPokeMe;
 
   let pool: IUniswapV3Pool;
   let maxFee: BigNumber;
@@ -38,7 +36,7 @@ describe("Cancel Eject LP Tests", function () {
 
   let tokenId: number;
 
-  let weth: IWETH9;
+  // let weth: IWETH9;
   let dai: IERC20;
 
   let addresses: Addresses;
@@ -56,22 +54,23 @@ describe("Cancel Eject LP Tests", function () {
 
     [user, user2] = await ethers.getSigners();
 
-    ejectPL = (await ethers.getContract("EjectLP")) as EjectLP;
     rangeOrder = (await ethers.getContract("RangeOrder")) as RangeOrder;
     rangeOrderResolver = (await ethers.getContract(
       "RangeOrderResolver"
     )) as RangeOrderResolver;
-    factory = (await ethers.getContractAt(
-      "IUniswapV3Factory",
+    factory = await ethers.getContractAt(
+      [
+        "function getPool(address tokenA,address tokenB,uint24 fee) view returns (address pool)",
+      ],
       addresses.UniswapV3Factory,
       user
-    )) as IUniswapV3Factory;
+    );
 
-    weth = (await ethers.getContractAt(
-      "IWETH9",
-      addresses.WETH,
-      user
-    )) as IWETH9;
+    // weth = (await ethers.getContractAt(
+    //   "IWETH9",
+    //   addresses.WETH,
+    //   user
+    // )) as IWETH9;
 
     dai = await ethers.getContractAt("IERC20", addresses.DAI, user);
 
@@ -80,11 +79,11 @@ describe("Cancel Eject LP Tests", function () {
       addresses.SwapRouter,
       user
     )) as ISwapRouter;
-    pokeMe = (await ethers.getContractAt(
-      "IPokeMe",
-      addresses.PokeMe,
-      user
-    )) as IPokeMe;
+    // pokeMe = (await ethers.getContractAt(
+    //   "IPokeMe",
+    //   addresses.PokeMe,
+    //   user
+    // )) as IPokeMe;
 
     //#region Start Submission
 
@@ -258,9 +257,9 @@ describe("Cancel Eject LP Tests", function () {
 
     // Start re Check can eject
 
-    let data;
+    // let data;
 
-    [canExec, data] = await rangeOrderResolver.checker(
+    [canExec] = await rangeOrderResolver.checker(
       tokenId,
       {
         tickThreshold,
