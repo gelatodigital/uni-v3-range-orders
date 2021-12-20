@@ -118,7 +118,6 @@ describe("Cancel Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
-
     tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
 
     amountIn = ethers.utils.parseEther("42000");

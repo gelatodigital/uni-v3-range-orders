@@ -34,5 +34,9 @@ interface IEjectLP {
 
     function schedule(OrderParams memory orderParams_) external payable;
 
-    function ejectOrSettle(uint256 tokenId_, Order memory order_, bool isEjection_) external;
+    function ejectOrSettle(
+        uint256 tokenId_,
+        Order memory order_,
+        bool isEjection_
+    ) external;
 }

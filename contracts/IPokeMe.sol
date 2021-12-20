@@ -24,7 +24,7 @@ interface IPokeMe {
         address _feeToken,
         address _taskCreator,
         bool _useTaskTreasuryFunds,
-        bytes32  _resolverHash,
+        bytes32 _resolverHash,
         address _execAddress,
         bytes calldata _execData
     ) external;

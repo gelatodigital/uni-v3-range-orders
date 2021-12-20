@@ -127,7 +127,10 @@ contract RangeOrder is
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
-                if (address(tokenIn) == address(WETH9) && msg.value > params_.maxFeeAmount) {
+                if (
+                    address(tokenIn) == address(WETH9) &&
+                    msg.value > params_.maxFeeAmount
+                ) {
                     require(
                         msg.value > params_.amountIn,
                         "RangeOrder:setRangeOrder:: Invalid amount in."

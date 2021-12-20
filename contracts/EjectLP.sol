@@ -388,9 +388,7 @@ contract EjectLP is
         emit LogEject(tokenId_, amount0, amount1, feeAmount, order_.receiver);
     }
 
-    function _settleAtExpiry(uint256 tokenId_, Order memory order_)
-        internal
-    {
+    function _settleAtExpiry(uint256 tokenId_, Order memory order_) internal {
         (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
 
         (bool expired, string memory reason) = isExpired(
