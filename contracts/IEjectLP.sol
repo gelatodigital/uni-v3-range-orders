@@ -11,6 +11,16 @@ import {IPokeMe} from "./IPokeMe.sol";
 import {Order, OrderParams} from "./structs/SEject.sol";
 
 interface IEjectLP {
+    function cancel(uint256 tokenId_, Order memory order_) external;
+
+    function schedule(OrderParams memory orderParams_) external payable;
+
+    function ejectOrSettle(
+        uint256 tokenId_,
+        Order memory order_,
+        bool isEjection_
+    ) external;
+
     function factory() external view returns (address);
 
     function pokeMe() external view returns (IPokeMe);
@@ -29,14 +39,4 @@ interface IEjectLP {
         Order memory order_,
         address feeToken_
     ) external view returns (bool, string memory);
-
-    function cancel(uint256 tokenId_, Order memory order_) external;
-
-    function schedule(OrderParams memory orderParams_) external payable;
-
-    function ejectOrSettle(
-        uint256 tokenId_,
-        Order memory order_,
-        bool isEjection_
-    ) external;
 }

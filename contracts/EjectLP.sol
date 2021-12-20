@@ -34,6 +34,7 @@ import {ETH, OK} from "./constants/CEjectLP.sol";
 import {_collect, _pool} from "./functions/FEjectLp.sol";
 
 // BE CAREFUL: DOT NOT CHANGE THE ORDER OF INHERITED CONTRACT
+// solhint-disable-next-line max-states-count
 contract EjectLP is
     Initializable,
     Proxied,
@@ -153,22 +154,13 @@ contract EjectLP is
         onlyProxyAdmin
     {
         for (uint256 i = 0; i < tokens_.length; i++) {
-            retrieveDust(tokens_[i], recipient_);
+            _retrieveDust(tokens_[i], recipient_);
         }
-    }
-
-    function retrieveDust(address token_, address recipient_)
-        public
-        onlyProxyAdmin
-    {
-        IERC20 token = IERC20(token_);
-        uint256 balance = token.balanceOf(address(this));
-
-        if (balance > 0) token.safeTransfer(recipient_, balance);
     }
 
     // !!!!!!!!!!!!!!!!!!!!!!!! EXTERNAL FUNCTIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+    // solhint-disable-next-line function-max-lines
     function schedule(OrderParams memory orderParams_)
         external
         payable
@@ -194,7 +186,7 @@ contract EjectLP is
             receiver: orderParams_.receiver,
             owner: msg.sender,
             maxFeeAmount: orderParams_.maxFeeAmount,
-            startTime: block.timestamp
+            startTime: block.timestamp // solhint-disable-line not-rely-on-time
         });
 
         hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
@@ -214,7 +206,7 @@ contract EjectLP is
         emit LogSetEject(
             orderParams_.tokenId,
             orderParams_,
-            block.timestamp,
+            block.timestamp, // solhint-disable-line not-rely-on-time
             msg.sender
         );
     }
@@ -313,6 +305,7 @@ contract EjectLP is
         return liquidity;
     }
 
+    // solhint-disable-next-line code-complexity
     function isEjectable(
         uint256 tokenId_,
         Order memory order_,
@@ -328,6 +321,7 @@ contract EjectLP is
     {
         if (hashById[tokenId_] != keccak256(abi.encode(order_)))
             return (false, "EjectLP::isEjectable: incorrect task hash");
+        // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration <= block.timestamp)
             return (false, "EjectLP::isEjectable: range order expired");
 
@@ -360,6 +354,7 @@ contract EjectLP is
     {
         if (hashById[tokenId_] != keccak256(abi.encode(order_)))
             return (false, "EjectLP::isExpired: incorrect task hash");
+        // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration > block.timestamp)
             return (false, "EjectLP::isExpired: not expired");
         if (feeToken_ != ETH)
@@ -437,5 +432,15 @@ contract EjectLP is
                 payable(order_.receiver),
                 order_.maxFeeAmount - feeAmount_
             );
+    }
+
+    function _retrieveDust(address token_, address recipient_)
+        internal
+        onlyProxyAdmin
+    {
+        IERC20 token = IERC20(token_);
+        uint256 balance = token.balanceOf(address(this));
+
+        if (balance > 0) token.safeTransfer(recipient_, balance);
     }
 }

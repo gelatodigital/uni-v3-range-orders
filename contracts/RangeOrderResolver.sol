@@ -16,6 +16,7 @@ contract RangeOrderResolver is IEjectResolver {
         ejectLP = ejectLP_;
     }
 
+    // solhint-disable-next-line function-max-lines
     function checker(
         uint256 tokenId_,
         Order memory order_,

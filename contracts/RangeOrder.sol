@@ -190,6 +190,7 @@ contract RangeOrder is
         emit LogSetRangeOrder(tokenId, address(params_.pool), params_.amountIn);
     }
 
+    // solhint-disable-next-line function-max-lines
     function cancelRangeOrder(
         uint256 tokenId_,
         RangeOrderParams calldata params_,
