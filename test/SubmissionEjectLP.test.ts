@@ -1,15 +1,11 @@
 import { expect } from "chai";
 import { Signer } from "@ethersproject/abstract-signer";
 import hre = require("hardhat");
-import {
-  IERC20,
-  IUniswapV3Factory,
-  IUniswapV3Pool,
-  RangeOrder,
-} from "../typechain";
+import { IERC20, IUniswapV3Pool, RangeOrder } from "../typechain";
 import { Addresses, getAddresses } from "../src/addresses";
 import { ISwapRouter } from "../typechain/ISwapRouter";
 import { IWETH9 } from "../typechain/IWETH9";
+import { Contract } from "ethers";
 
 const { ethers, deployments } = hre;
 
@@ -18,7 +14,7 @@ describe("Submission Eject LP Tests", function () {
 
   let user: Signer;
   let rangeOrder: RangeOrder;
-  let factory: IUniswapV3Factory;
+  let factory: Contract;
   let swapRouter: ISwapRouter;
 
   let weth: IWETH9;
@@ -38,11 +34,13 @@ describe("Submission Eject LP Tests", function () {
     [user] = await ethers.getSigners();
 
     rangeOrder = (await ethers.getContract("RangeOrder")) as RangeOrder;
-    factory = (await ethers.getContractAt(
-      "IUniswapV3Factory",
+    factory = await ethers.getContractAt(
+      [
+        "function getPool(address tokenA,address tokenB,uint24 fee) view returns (address pool)",
+      ],
       addresses.UniswapV3Factory,
       user
-    )) as IUniswapV3Factory;
+    );
 
     weth = (await ethers.getContractAt(
       "IWETH9",
