@@ -10,12 +10,12 @@ import {
 } from "../vendor/INonfungiblePositionManager.sol";
 
 function _collect(
-    INonfungiblePositionManager nftPositions_,
+    INonfungiblePositionManager nftPositionManager_,
     uint256 tokenId_,
     uint128 liquidity_,
     address recipient_
 ) returns (uint256 amount0, uint256 amount1) {
-    nftPositions_.decreaseLiquidity(
+    nftPositionManager_.decreaseLiquidity(
         INonfungiblePositionManager.DecreaseLiquidityParams({
             tokenId: tokenId_,
             liquidity: liquidity_,
@@ -24,7 +24,7 @@ function _collect(
             deadline: block.timestamp // solhint-disable-line not-rely-on-time
         })
     );
-    (amount0, amount1) = nftPositions_.collect(
+    (amount0, amount1) = nftPositionManager_.collect(
         INonfungiblePositionManager.CollectParams({
             tokenId: tokenId_,
             recipient: recipient_,

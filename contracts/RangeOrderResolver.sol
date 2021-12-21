@@ -47,7 +47,7 @@ contract RangeOrderResolver is IEjectResolver {
             ,
             ,
 
-        ) = ejectLP.nftPositions().positions(tokenId_);
+        ) = ejectLP.nftPositionManager().positions(tokenId_);
         IUniswapV3Pool pool = _pool(ejectLP.factory(), token0, token1, feeTier);
         (bool isEjectable, ) = ejectLP.isEjectable(
             tokenId_,

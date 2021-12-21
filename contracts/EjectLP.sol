@@ -47,7 +47,7 @@ contract EjectLP is
     // solhint-disable-next-line max-line-length
     ////////////////////////////////////////// CONSTANTS AND IMMUTABLES ///////////////////////////////////
 
-    INonfungiblePositionManager public immutable override nftPositions;
+    INonfungiblePositionManager public immutable override nftPositionManager;
     IPokeMe public immutable override pokeMe;
     address public immutable override factory;
     address internal immutable _gelato;
@@ -97,7 +97,7 @@ contract EjectLP is
 
     modifier isApproved(uint256 tokenId_) {
         require(
-            nftPositions.getApproved(tokenId_) == address(this),
+            nftPositionManager.getApproved(tokenId_) == address(this),
             "EjectLP::isApproved: EjectLP should be a operator"
         );
         _;
@@ -105,19 +105,19 @@ contract EjectLP is
 
     modifier onlyPositionOwner(uint256 tokenId_, address owner_) {
         require(
-            nftPositions.ownerOf(tokenId_) == owner_,
+            nftPositionManager.ownerOf(tokenId_) == owner_,
             "EjectLP:schedule:: only owner"
         );
         _;
     }
 
     constructor(
-        INonfungiblePositionManager nftPositions_,
+        INonfungiblePositionManager nftPositionManager_,
         IPokeMe pokeMe_,
         address factory_,
         address gelato_
     ) {
-        nftPositions = nftPositions_;
+        nftPositionManager = nftPositionManager_;
         factory = factory_;
         pokeMe = pokeMe_;
         _gelato = gelato_;
@@ -178,6 +178,10 @@ contract EjectLP is
         require(
             orderParams_.maxFeeAmount == msg.value,
             "EjectLP::schedule: maxFeeAmount !== msg.value"
+        );
+        require(
+            orderParams_.feeToken == ETH,
+            "EjectLP::schedule: only native token"
         );
 
         Order memory order = Order({
@@ -247,7 +251,7 @@ contract EjectLP is
             ,
             ,
 
-        ) = nftPositions.positions(tokenId_);
+        ) = nftPositionManager.positions(tokenId_);
 
         (, int24 tick, , , , , ) = _pool(factory, token0, token1, feeTier)
             .slot0();
@@ -289,8 +293,20 @@ contract EjectLP is
             address token0;
             address token1;
             uint24 feeTier;
-            (, , token0, token1, feeTier, , , liquidity, , , , ) = nftPositions
-                .positions(tokenId_);
+            (
+                ,
+                ,
+                token0,
+                token1,
+                feeTier,
+                ,
+                ,
+                liquidity,
+                ,
+                ,
+                ,
+
+            ) = nftPositionManager.positions(tokenId_);
             pool = _pool(factory, token0, token1, feeTier);
         }
         (bool isOk, string memory reason) = isEjectable(
@@ -393,9 +409,8 @@ contract EjectLP is
         );
         require(expired, reason);
 
-        (, , , , , , , uint128 liquidity, , , , ) = nftPositions.positions(
-            tokenId_
-        );
+        (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
+            .positions(tokenId_);
 
         (uint256 amount0, uint256 amount1) = _collectAndSend(
             tokenId_,
@@ -414,7 +429,7 @@ contract EjectLP is
         uint256 feeAmount_
     ) internal returns (uint256 amount0, uint256 amount1) {
         (amount0, amount1) = _collect(
-            nftPositions,
+            nftPositionManager,
             tokenId_,
             liquidity_,
             order_.receiver
@@ -427,11 +442,14 @@ contract EjectLP is
 
         // gelato fee in native token
         AddressUpgradeable.sendValue(payable(_gelato), feeAmount_);
-        if (feeAmount_ < order_.maxFeeAmount)
-            AddressUpgradeable.sendValue(
-                payable(order_.receiver),
-                order_.maxFeeAmount - feeAmount_
-            );
+        if (feeAmount_ < order_.maxFeeAmount) {
+            unchecked {
+                AddressUpgradeable.sendValue(
+                    payable(order_.receiver),
+                    order_.maxFeeAmount - feeAmount_
+                );
+            }
+        }
     }
 
     function _retrieveDust(address token_, address recipient_)

@@ -25,7 +25,10 @@ interface IEjectLP {
 
     function pokeMe() external view returns (IPokeMe);
 
-    function nftPositions() external view returns (INonfungiblePositionManager);
+    function nftPositionManager()
+        external
+        view
+        returns (INonfungiblePositionManager);
 
     function isEjectable(
         uint256 tokenId_,

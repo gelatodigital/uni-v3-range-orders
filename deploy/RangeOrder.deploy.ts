@@ -31,6 +31,7 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       },
     },
     args: [
+      addresses.NonfungiblePositionManager,
       (await ethers.getContract("EjectLP")).address,
       addresses.WETH,
       (await ethers.getContract("RangeOrderResolver")).address,

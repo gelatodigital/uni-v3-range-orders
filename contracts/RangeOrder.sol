@@ -44,6 +44,7 @@ contract RangeOrder is
     // solhint-disable-next-line max-line-length
     ////////////////////////////////////////// CONSTANTS AND IMMUTABLES ///////////////////////////////////
 
+    INonfungiblePositionManager public immutable nftPositionManager;
     IEjectLP public immutable eject;
     IWETH9 public immutable WETH9; // solhint-disable-line var-name-mixedcase
     address public immutable rangeOrderResolver;
@@ -64,10 +65,12 @@ contract RangeOrder is
 
     // solhint-disable-next-line var-name-mixedcase, func-param-name-mixedcase
     constructor(
+        INonfungiblePositionManager nftPositionManager_,
         IEjectLP eject_,
         IWETH9 WETH9_, // solhint-disable-line var-name-mixedcase, func-param-name-mixedcase
         address rangeOrderResolver_
     ) {
+        nftPositionManager = nftPositionManager_;
         eject = eject_;
         WETH9 = WETH9_;
         rangeOrderResolver = rangeOrderResolver_;
@@ -122,8 +125,6 @@ contract RangeOrder is
             address token1 = params_.pool.token1();
             fee = params_.pool.fee();
 
-            INonfungiblePositionManager positions = eject.nftPositions();
-
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
 
@@ -155,10 +156,13 @@ contract RangeOrder is
                     );
                 }
 
-                tokenIn.safeApprove(address(positions), params_.amountIn);
+                tokenIn.safeApprove(
+                    address(nftPositionManager),
+                    params_.amountIn
+                );
             }
 
-            (tokenId, , , ) = positions.mint(
+            (tokenId, , , ) = nftPositionManager.mint(
                 INonfungiblePositionManager.MintParams({
                     token0: token0,
                     token1: token1,
@@ -173,7 +177,7 @@ contract RangeOrder is
                     deadline: block.timestamp // solhint-disable-line not-rely-on-time
                 })
             );
-            positions.approve(address(eject), tokenId);
+            nftPositionManager.approve(address(eject), tokenId);
             eject.schedule{value: params_.maxFeeAmount}(
                 OrderParams({
                     tokenId: tokenId,
@@ -223,16 +227,13 @@ contract RangeOrder is
             })
         );
 
-        INonfungiblePositionManager positions = eject.nftPositions();
+        (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
+            .positions(tokenId_);
 
-        (, , , , , , , uint128 liquidity, , , , ) = positions.positions(
-            tokenId_
-        );
-
-        positions.approve(params_.receiver, tokenId_); // remove approval to EjectLP.
+        nftPositionManager.approve(params_.receiver, tokenId_); // remove approval to EjectLP.
 
         (uint256 amount0, uint256 amount1) = _collect(
-            positions,
+            nftPositionManager,
             tokenId_,
             liquidity,
             params_.receiver
