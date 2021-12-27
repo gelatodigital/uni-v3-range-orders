@@ -22,6 +22,18 @@ contract RangeOrderResolver is IEjectResolver {
         Order memory order_,
         address feeToken_
     ) external view override returns (bool, bytes memory data) {
+        (bool isBurnt, ) = ejectLP.isBurnt(tokenId_);
+        if (isBurnt) {
+            return (
+                true,
+                abi.encodeWithSelector(
+                    IEjectLP.ejectOrSettle.selector,
+                    tokenId_,
+                    order_,
+                    false
+                )
+            );
+        }
         (bool isExpired, ) = ejectLP.isExpired(tokenId_, order_, feeToken_);
         if (isExpired)
             return (

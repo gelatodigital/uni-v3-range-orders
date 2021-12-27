@@ -42,4 +42,9 @@ interface IEjectLP {
         Order memory order_,
         address feeToken_
     ) external view returns (bool, string memory);
+
+    function isBurnt(uint256 tokenId_)
+        external
+        view
+        returns (bool, string memory);
 }

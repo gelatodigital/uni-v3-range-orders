@@ -1,6 +1,6 @@
 import { network, ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-import { IUniswapV3Pool, RangeOrder } from "../typechain";
+import { RangeOrder } from "../typechain";
 import { isString } from "util";
 import { getAddresses } from "../src/addresses";
 
@@ -10,13 +10,13 @@ async function main(signer: SignerWithAddress | string) {
     signer
   )) as RangeOrder;
   const addresss = getAddresses(network.name);
-  const pool = (await ethers.getContractAt(
-    "IUniswapV3Pool",
-    addresss.TestPool,
-    signer
-  )) as IUniswapV3Pool;
+  // const pool = (await ethers.getContractAt(
+  //   "IUniswapV3Pool",
+  //   addresss.TestPool,
+  //   signer
+  // )) as IUniswapV3Pool;
 
-  const currentTick = (await pool.slot0()).tick; // get from etherscan for goerli
+  // const currentTick = (await pool.slot0()).tick; // get from etherscan for goerli
   const tokenId = 1586; // get from etherscan for goerli
 
   const tx = await rangeOrder.cancelRangeOrder(
@@ -29,7 +29,8 @@ async function main(signer: SignerWithAddress | string) {
       receiver: isString(signer) ? signer : signer.address,
       maxFeeAmount: ethers.utils.parseEther("0.005"),
     },
-    1638798518
+    1638798518,
+    true
   );
   console.log("range order tx:", tx.hash);
 }

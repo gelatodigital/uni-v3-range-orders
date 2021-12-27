@@ -198,7 +198,8 @@ contract RangeOrder is
     function cancelRangeOrder(
         uint256 tokenId_,
         RangeOrderParams calldata params_,
-        uint256 startTime_
+        uint256 startTime_,
+        bool tokenBurnt_
     ) external whenNotPaused nonReentrant {
         require(
             params_.receiver == msg.sender,
@@ -213,7 +214,6 @@ contract RangeOrder is
         int24 upperTick = params_.zeroForOne
             ? params_.tickThreshold + tickSpacing
             : params_.tickThreshold;
-        _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
 
         eject.cancel(
             tokenId_,
@@ -226,6 +226,11 @@ contract RangeOrder is
                 startTime: startTime_
             })
         );
+
+        if (tokenBurnt_) {
+            emit LogCancelRangeOrder(tokenId_, 0, 0);
+            return;
+        }
 
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
