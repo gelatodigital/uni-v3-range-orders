@@ -599,8 +599,7 @@ describe("Eject LP Integration Test", function () {
         receiver,
         maxFeeAmount: maxFee,
       },
-      blockTime,
-      false
+      blockTime
     );
 
     // End Cancel Range Order

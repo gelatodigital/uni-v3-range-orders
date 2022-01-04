@@ -169,8 +169,7 @@ describe("Cancel Eject LP Tests", function () {
         receiver,
         maxFeeAmount: maxFee,
       },
-      submissionBlockTime,
-      false
+      submissionBlockTime
     );
 
     const receipt = await tx.wait();
@@ -196,8 +195,7 @@ describe("Cancel Eject LP Tests", function () {
           receiver,
           maxFeeAmount: maxFee,
         },
-        submissionBlockTime,
-        false
+        submissionBlockTime
       )
     ).to.be.revertedWith("RangeOrder::cancelRangeOrder: only receiver.");
   });
@@ -214,8 +212,7 @@ describe("Cancel Eject LP Tests", function () {
           receiver,
           maxFeeAmount: maxFee.add(1),
         },
-        submissionBlockTime,
-        false
+        submissionBlockTime
       )
     ).to.be.revertedWith("EjectLP::cancel: invalid hash");
   });
@@ -292,8 +289,7 @@ describe("Cancel Eject LP Tests", function () {
           receiver,
           maxFeeAmount: maxFee,
         },
-        submissionBlockTime,
-        false
+        submissionBlockTime
       )
     ).to.not.be.reverted;
 

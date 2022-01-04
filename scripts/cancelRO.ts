@@ -29,8 +29,7 @@ async function main(signer: SignerWithAddress | string) {
       receiver: isString(signer) ? signer : signer.address,
       maxFeeAmount: ethers.utils.parseEther("0.005"),
     },
-    1638798518,
-    true
+    1638798518
   );
   console.log("range order tx:", tx.hash);
 }

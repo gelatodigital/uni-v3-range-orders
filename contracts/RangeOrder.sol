@@ -162,21 +162,26 @@ contract RangeOrder is
                 );
             }
 
-            (tokenId, , , ) = nftPositionManager.mint(
-                INonfungiblePositionManager.MintParams({
-                    token0: token0,
-                    token1: token1,
-                    fee: fee,
-                    tickLower: lowerTick,
-                    tickUpper: upperTick,
-                    amount0Desired: params_.zeroForOne ? params_.amountIn : 0,
-                    amount1Desired: params_.zeroForOne ? 0 : params_.amountIn,
-                    amount0Min: params_.zeroForOne ? params_.amountIn : 0,
-                    amount1Min: params_.zeroForOne ? 0 : params_.amountIn,
-                    recipient: address(this),
-                    deadline: block.timestamp // solhint-disable-line not-rely-on-time
-                })
-            );
+            {
+                uint256 amount0 = params_.zeroForOne ? params_.amountIn : 0;
+                uint256 amount1 = params_.zeroForOne ? 0 : params_.amountIn;
+                (tokenId, , , ) = nftPositionManager.mint(
+                    INonfungiblePositionManager.MintParams({
+                        token0: token0,
+                        token1: token1,
+                        fee: fee,
+                        tickLower: lowerTick,
+                        tickUpper: upperTick,
+                        amount0Desired: amount0,
+                        amount1Desired: amount1,
+                        amount0Min: amount0,
+                        amount1Min: amount1,
+                        recipient: address(this),
+                        deadline: block.timestamp // solhint-disable-line not-rely-on-time
+                    })
+                );
+            }
+
             nftPositionManager.approve(address(eject), tokenId);
             eject.schedule{value: params_.maxFeeAmount}(
                 OrderParams({
@@ -198,8 +203,7 @@ contract RangeOrder is
     function cancelRangeOrder(
         uint256 tokenId_,
         RangeOrderParams calldata params_,
-        uint256 startTime_,
-        bool tokenBurnt_
+        uint256 startTime_
     ) external whenNotPaused nonReentrant {
         require(
             params_.receiver == msg.sender,
@@ -226,11 +230,6 @@ contract RangeOrder is
                 startTime: startTime_
             })
         );
-
-        if (tokenBurnt_) {
-            emit LogCancelRangeOrder(tokenId_, 0, 0);
-            return;
-        }
 
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
