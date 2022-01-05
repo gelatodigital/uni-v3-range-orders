@@ -149,6 +149,7 @@ contract EjectLP is
     }
 
     function setDuration(uint256 duration_) external onlyProxyAdmin {
+        require(duration_ > duration, "EjectLP::setDuration: only increase.");
         duration = duration_;
         emit LogSetDuration(duration_);
     }
@@ -430,14 +431,9 @@ contract EjectLP is
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
 
-        (uint256 amount0, uint256 amount1) = _collectAndSend(
-            tokenId_,
-            order_,
-            liquidity,
-            feeAmount
-        );
+        _send(tokenId_, order_, feeAmount);
 
-        emit LogSettle(tokenId_, amount0, amount1, feeAmount, order_.receiver);
+        emit LogSettle(tokenId_, 0, 0, feeAmount, order_.receiver);
     }
 
     function _collectAndSend(

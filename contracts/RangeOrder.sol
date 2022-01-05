@@ -186,7 +186,7 @@ contract RangeOrder is
             eject.schedule{value: params_.maxFeeAmount}(
                 OrderParams({
                     tokenId: tokenId,
-                    tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
+                    tickThreshold: params_.tickThreshold,
                     ejectAbove: params_.zeroForOne,
                     receiver: params_.receiver,
                     feeToken: ETH,
@@ -210,19 +210,10 @@ contract RangeOrder is
             "RangeOrder::cancelRangeOrder: only receiver."
         );
 
-        int24 tickSpacing = params_.pool.tickSpacing();
-
-        int24 lowerTick = params_.zeroForOne
-            ? params_.tickThreshold
-            : params_.tickThreshold - tickSpacing;
-        int24 upperTick = params_.zeroForOne
-            ? params_.tickThreshold + tickSpacing
-            : params_.tickThreshold;
-
         eject.cancel(
             tokenId_,
             Order({
-                tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
+                tickThreshold: params_.tickThreshold,
                 ejectAbove: params_.zeroForOne,
                 receiver: params_.receiver,
                 owner: address(this),
