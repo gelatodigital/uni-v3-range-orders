@@ -191,7 +191,8 @@ contract RangeOrder is
                     receiver: params_.receiver,
                     feeToken: ETH,
                     resolver: rangeOrderResolver,
-                    maxFeeAmount: params_.maxFeeAmount
+                    maxFeeAmount: params_.maxFeeAmount,
+                    ejectAtExpiry: true
                 })
             );
         }
@@ -218,7 +219,8 @@ contract RangeOrder is
                 receiver: params_.receiver,
                 owner: address(this),
                 maxFeeAmount: params_.maxFeeAmount,
-                startTime: startTime_
+                startTime: startTime_,
+                ejectAtExpiry: true
             })
         );
 

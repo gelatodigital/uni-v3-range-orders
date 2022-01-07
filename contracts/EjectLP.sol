@@ -216,7 +216,8 @@ contract EjectLP is
             receiver: orderParams_.receiver,
             owner: msg.sender,
             maxFeeAmount: orderParams_.maxFeeAmount,
-            startTime: block.timestamp // solhint-disable-line not-rely-on-time
+            startTime: block.timestamp, // solhint-disable-line not-rely-on-time
+            ejectAtExpiry: orderParams_.ejectAtExpiry
         });
 
         hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
@@ -431,7 +432,9 @@ contract EjectLP is
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
 
-        _send(tokenId_, order_, feeAmount);
+        if (order_.ejectAtExpiry)
+            _collectAndSend(tokenId_, order_, liquidity, feeAmount);
+        else _send(tokenId_, order_, feeAmount);
 
         emit LogSettle(tokenId_, 0, 0, feeAmount, order_.receiver);
     }

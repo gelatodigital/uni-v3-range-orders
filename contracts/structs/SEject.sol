@@ -8,6 +8,7 @@ struct Order {
     address owner;
     uint256 maxFeeAmount;
     uint256 startTime;
+    bool ejectAtExpiry;
 }
 
 struct OrderParams {
@@ -18,4 +19,5 @@ struct OrderParams {
     address feeToken;
     address resolver;
     uint256 maxFeeAmount;
+    bool ejectAtExpiry;
 }
