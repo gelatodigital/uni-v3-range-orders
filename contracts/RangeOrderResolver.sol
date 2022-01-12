@@ -23,7 +23,10 @@ contract RangeOrderResolver is IEjectResolver {
         Order memory order_,
         address feeToken_
     ) external view override returns (bool, bytes memory data) {
-        if (feeToken_ != ETH) return (false, "");
+        if (
+            feeToken_ != ETH ||
+            ejectLP.hashById(tokenId_) != keccak256(abi.encode(order_))
+        ) return (false, "");
 
         (bool isExpired, ) = ejectLP.isExpired(tokenId_, order_);
         if (isExpired)

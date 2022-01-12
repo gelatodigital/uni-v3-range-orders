@@ -21,6 +21,8 @@ interface IEjectLP {
         bool isEjection_
     ) external;
 
+    function hashById(uint256 tokenId_) external view returns (bytes32);
+
     function factory() external view returns (address);
 
     function pokeMe() external view returns (IPokeMe);

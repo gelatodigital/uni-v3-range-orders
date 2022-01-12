@@ -53,7 +53,7 @@ contract EjectLP is
 
     // !!!!!!!!!!!!!!!!!!!!!!!! DO NOT CHANGE ORDER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    mapping(uint256 => bytes32) public hashById;
+    mapping(uint256 => bytes32) public override hashById;
     mapping(uint256 => bytes32) public taskById;
 
     uint256 public duration;
@@ -247,6 +247,10 @@ contract EjectLP is
         Order memory order_,
         bool isEjection_
     ) external override whenNotPaused nonReentrant onlyPokeMe {
+        require(
+            hashById[tokenId_] == keccak256(abi.encode(order_)),
+            "EjectLP::ejectOrSettle: incorrect task hash"
+        );
         if (isEjection_) _eject(tokenId_, order_);
         else _settle(tokenId_, order_);
     }
@@ -318,8 +322,6 @@ contract EjectLP is
         Order memory order_,
         IUniswapV3Pool pool_
     ) public view override isApproved(tokenId_) returns (bool, string memory) {
-        if (hashById[tokenId_] != keccak256(abi.encode(order_)))
-            return (false, "EjectLP::isEjectable: incorrect task hash");
         // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration <= block.timestamp)
             return (false, "EjectLP::isEjectable: range order expired");
@@ -343,8 +345,6 @@ contract EjectLP is
         isApproved(tokenId_)
         returns (bool, string memory)
     {
-        if (hashById[tokenId_] != keccak256(abi.encode(order_)))
-            return (false, "EjectLP::isExpired: incorrect task hash");
         // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration > block.timestamp)
             return (false, "EjectLP::isExpired: not expired");
@@ -393,6 +393,7 @@ contract EjectLP is
     function _eject(uint256 tokenId_, Order memory order_)
         internal
         onlyPositionOwner(tokenId_, order_.owner)
+        isApproved(tokenId_)
     {
         uint256 feeAmount = _getFeeDetails();
 
@@ -429,14 +430,19 @@ contract EjectLP is
         (bool expired, string memory reason) = isExpired(tokenId_, order_);
         require(expired, reason);
 
+        if (!order_.ejectAtExpiry) return _send(tokenId_, order_, feeAmount);
+
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
 
-        if (order_.ejectAtExpiry)
-            _collectAndSend(tokenId_, order_, liquidity, feeAmount);
-        else _send(tokenId_, order_, feeAmount);
+        (uint256 amount0, uint256 amount1) = _collectAndSend(
+            tokenId_,
+            order_,
+            liquidity,
+            feeAmount
+        );
 
-        emit LogSettle(tokenId_, 0, 0, feeAmount, order_.receiver);
+        emit LogSettle(tokenId_, amount0, amount1, feeAmount, order_.receiver);
     }
 
     function _collectAndSend(
@@ -444,7 +450,7 @@ contract EjectLP is
         Order memory order_,
         uint128 liquidity_,
         uint256 feeAmount_
-    ) internal isApproved(tokenId_) returns (uint256 amount0, uint256 amount1) {
+    ) internal returns (uint256 amount0, uint256 amount1) {
         (amount0, amount1) = _collect(
             nftPositionManager,
             tokenId_,
