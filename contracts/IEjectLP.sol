@@ -38,7 +38,7 @@ interface IEjectLP {
         IUniswapV3Pool pool_
     ) external view returns (bool, string memory);
 
-    function isExpired(uint256 tokenId_, Order memory order_)
+    function isExpired(Order memory order_)
         external
         view
         returns (bool, string memory);

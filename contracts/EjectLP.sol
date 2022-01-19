@@ -321,7 +321,7 @@ contract EjectLP is
         uint256 tokenId_,
         Order memory order_,
         IUniswapV3Pool pool_
-    ) public view override isApproved(tokenId_) returns (bool, string memory) {
+    ) public view override returns (bool, string memory) {
         // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration <= block.timestamp)
             return (false, "EjectLP::isEjectable: range order expired");
@@ -335,14 +335,16 @@ contract EjectLP is
         if (!order_.ejectAbove && tick >= order_.tickThreshold - tickSpacing)
             return (false, "EjectLP::isEjectable: price not met");
 
+        (bool notApproved, ) = isNotApproved(tokenId_);
+        if (notApproved) return (false, "EjectLP::isEjectable: not approved");
+
         return (true, OK);
     }
 
-    function isExpired(uint256 tokenId_, Order memory order_)
+    function isExpired(Order memory order_)
         public
         view
         override
-        isApproved(tokenId_)
         returns (bool, string memory)
     {
         // solhint-disable-next-line not-rely-on-time
@@ -427,10 +429,11 @@ contract EjectLP is
         (bool notApproved, ) = isNotApproved(tokenId_);
         if (notApproved) return _sendFund(tokenId_, order_, feeAmount);
 
-        (bool expired, string memory reason) = isExpired(tokenId_, order_);
+        (bool expired, string memory reason) = isExpired(order_);
         require(expired, reason);
 
-        if (!order_.ejectAtExpiry) return _send(tokenId_, order_, feeAmount);
+        if (!order_.ejectAtExpiry)
+            return _sendFund(tokenId_, order_, feeAmount);
 
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);

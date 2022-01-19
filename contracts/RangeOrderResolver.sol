@@ -28,7 +28,7 @@ contract RangeOrderResolver is IEjectResolver {
             ejectLP.hashById(tokenId_) != keccak256(abi.encode(order_))
         ) return (false, "");
 
-        (bool isExpired, ) = ejectLP.isExpired(tokenId_, order_);
+        (bool isExpired, ) = ejectLP.isExpired(order_);
         if (isExpired)
             return (
                 true,
