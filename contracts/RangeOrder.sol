@@ -119,7 +119,11 @@ contract RangeOrder is
                     : params_.tickThreshold;
             }
 
-            _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
+            _requirePoolTickNotInRange(
+                params_.pool,
+                params_.tickThreshold,
+                params_.zeroForOne
+            );
 
             address token0 = params_.pool.token0();
             address token1 = params_.pool.token1();
@@ -248,15 +252,15 @@ contract RangeOrder is
         return IERC721Receiver.onERC721Received.selector;
     }
 
-    function _requireThresholdNotInRange(
+    function _requirePoolTickNotInRange(
         IUniswapV3Pool pool_,
-        int24 lowerTick_,
-        int24 upperTick_
+        int24 tickThreshold,
+        bool ejectAbove
     ) internal view {
         (, int24 tick, , , , , ) = pool_.slot0();
 
         require(
-            tick < lowerTick_ || tick > upperTick_,
+            ejectAbove ? tick < tickThreshold : tick > tickThreshold,
             "RangeOrder:_requireThresholdInRange:: eject tick in range"
         );
     }
