@@ -7,6 +7,7 @@ import { getAddresses } from "../src/addresses";
 const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   if (
     hre.network.name === "mainnet" ||
+    hre.network.name === "matic" ||
     hre.network.name === "goerli" ||
     hre.network.name === "arbitrum"
   ) {
@@ -31,6 +32,7 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       },
     },
     args: [
+      addresses.NonfungiblePositionManager,
       (await ethers.getContract("EjectLP")).address,
       addresses.WETH,
       (await ethers.getContract("RangeOrderResolver")).address,
@@ -44,6 +46,7 @@ export default func;
 func.skip = async (hre: HardhatRuntimeEnvironment) => {
   const shouldSkip =
     hre.network.name === "mainnet" ||
+    hre.network.name === "matic" ||
     hre.network.name === "goerli" ||
     hre.network.name === "arbitrum";
   return shouldSkip ? true : false;

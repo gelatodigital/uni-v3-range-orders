@@ -44,6 +44,7 @@ contract RangeOrder is
     // solhint-disable-next-line max-line-length
     ////////////////////////////////////////// CONSTANTS AND IMMUTABLES ///////////////////////////////////
 
+    INonfungiblePositionManager public immutable nftPositionManager;
     IEjectLP public immutable eject;
     IWETH9 public immutable WETH9; // solhint-disable-line var-name-mixedcase
     address public immutable rangeOrderResolver;
@@ -64,10 +65,12 @@ contract RangeOrder is
 
     // solhint-disable-next-line var-name-mixedcase, func-param-name-mixedcase
     constructor(
+        INonfungiblePositionManager nftPositionManager_,
         IEjectLP eject_,
         IWETH9 WETH9_, // solhint-disable-line var-name-mixedcase, func-param-name-mixedcase
         address rangeOrderResolver_
     ) {
+        nftPositionManager = nftPositionManager_;
         eject = eject_;
         WETH9 = WETH9_;
         rangeOrderResolver = rangeOrderResolver_;
@@ -116,13 +119,15 @@ contract RangeOrder is
                     : params_.tickThreshold;
             }
 
-            _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
+            _requirePoolTickNotInRange(
+                params_.pool,
+                params_.tickThreshold,
+                params_.zeroForOne
+            );
 
             address token0 = params_.pool.token0();
             address token1 = params_.pool.token1();
             fee = params_.pool.fee();
-
-            INonfungiblePositionManager positions = eject.nftPositions();
 
             {
                 IERC20 tokenIn = IERC20(params_.zeroForOne ? token0 : token1);
@@ -155,34 +160,43 @@ contract RangeOrder is
                     );
                 }
 
-                tokenIn.safeApprove(address(positions), params_.amountIn);
+                tokenIn.safeApprove(
+                    address(nftPositionManager),
+                    params_.amountIn
+                );
             }
 
-            (tokenId, , , ) = positions.mint(
-                INonfungiblePositionManager.MintParams({
-                    token0: token0,
-                    token1: token1,
-                    fee: fee,
-                    tickLower: lowerTick,
-                    tickUpper: upperTick,
-                    amount0Desired: params_.zeroForOne ? params_.amountIn : 0,
-                    amount1Desired: params_.zeroForOne ? 0 : params_.amountIn,
-                    amount0Min: params_.zeroForOne ? params_.amountIn : 0,
-                    amount1Min: params_.zeroForOne ? 0 : params_.amountIn,
-                    recipient: address(this),
-                    deadline: block.timestamp // solhint-disable-line not-rely-on-time
-                })
-            );
-            positions.approve(address(eject), tokenId);
+            {
+                uint256 amount0 = params_.zeroForOne ? params_.amountIn : 0;
+                uint256 amount1 = params_.zeroForOne ? 0 : params_.amountIn;
+                (tokenId, , , ) = nftPositionManager.mint(
+                    INonfungiblePositionManager.MintParams({
+                        token0: token0,
+                        token1: token1,
+                        fee: fee,
+                        tickLower: lowerTick,
+                        tickUpper: upperTick,
+                        amount0Desired: amount0,
+                        amount1Desired: amount1,
+                        amount0Min: amount0,
+                        amount1Min: amount1,
+                        recipient: address(this),
+                        deadline: block.timestamp // solhint-disable-line not-rely-on-time
+                    })
+                );
+            }
+
+            nftPositionManager.approve(address(eject), tokenId);
             eject.schedule{value: params_.maxFeeAmount}(
                 OrderParams({
                     tokenId: tokenId,
-                    tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
+                    tickThreshold: params_.tickThreshold,
                     ejectAbove: params_.zeroForOne,
                     receiver: params_.receiver,
                     feeToken: ETH,
                     resolver: rangeOrderResolver,
-                    maxFeeAmount: params_.maxFeeAmount
+                    maxFeeAmount: params_.maxFeeAmount,
+                    ejectAtExpiry: true
                 })
             );
         }
@@ -201,38 +215,26 @@ contract RangeOrder is
             "RangeOrder::cancelRangeOrder: only receiver."
         );
 
-        int24 tickSpacing = params_.pool.tickSpacing();
-
-        int24 lowerTick = params_.zeroForOne
-            ? params_.tickThreshold
-            : params_.tickThreshold - tickSpacing;
-        int24 upperTick = params_.zeroForOne
-            ? params_.tickThreshold + tickSpacing
-            : params_.tickThreshold;
-        _requireThresholdNotInRange(params_.pool, lowerTick, upperTick);
-
         eject.cancel(
             tokenId_,
             Order({
-                tickThreshold: params_.zeroForOne ? lowerTick : upperTick,
+                tickThreshold: params_.tickThreshold,
                 ejectAbove: params_.zeroForOne,
                 receiver: params_.receiver,
                 owner: address(this),
                 maxFeeAmount: params_.maxFeeAmount,
-                startTime: startTime_
+                startTime: startTime_,
+                ejectAtExpiry: true
             })
         );
 
-        INonfungiblePositionManager positions = eject.nftPositions();
+        (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
+            .positions(tokenId_);
 
-        (, , , , , , , uint128 liquidity, , , , ) = positions.positions(
-            tokenId_
-        );
-
-        positions.approve(params_.receiver, tokenId_); // remove approval to EjectLP.
+        nftPositionManager.approve(params_.receiver, tokenId_); // remove approval to EjectLP.
 
         (uint256 amount0, uint256 amount1) = _collect(
-            positions,
+            nftPositionManager,
             tokenId_,
             liquidity,
             params_.receiver
@@ -250,15 +252,15 @@ contract RangeOrder is
         return IERC721Receiver.onERC721Received.selector;
     }
 
-    function _requireThresholdNotInRange(
+    function _requirePoolTickNotInRange(
         IUniswapV3Pool pool_,
-        int24 lowerTick_,
-        int24 upperTick_
+        int24 tickThreshold,
+        bool ejectAbove
     ) internal view {
         (, int24 tick, , , , , ) = pool_.slot0();
 
         require(
-            tick < lowerTick_ || tick > upperTick_,
+            ejectAbove ? tick < tickThreshold : tick > tickThreshold,
             "RangeOrder:_requireThresholdInRange:: eject tick in range"
         );
     }

@@ -167,6 +167,7 @@ describe("Eject LP Integration Test", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(blockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -209,6 +210,7 @@ describe("Eject LP Integration Test", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(blockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -242,6 +244,7 @@ describe("Eject LP Integration Test", function () {
             owner: rangeOrder.address,
             maxFeeAmount: maxFee,
             startTime: ethers.BigNumber.from(blockTime ?? 0),
+            ejectAtExpiry: true,
           },
           ETH,
         ])
@@ -347,6 +350,7 @@ describe("Eject LP Integration Test", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(blockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -376,6 +380,7 @@ describe("Eject LP Integration Test", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(blockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -412,6 +417,7 @@ describe("Eject LP Integration Test", function () {
             owner: rangeOrder.address,
             maxFeeAmount: maxFee,
             startTime: ethers.BigNumber.from(blockTime ?? 0),
+            ejectAtExpiry: true,
           },
           ETH,
         ])
