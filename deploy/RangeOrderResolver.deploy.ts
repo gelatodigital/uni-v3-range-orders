@@ -6,6 +6,7 @@ import { sleep } from "../src/utils";
 const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   if (
     hre.network.name === "mainnet" ||
+    hre.network.name === "matic" ||
     hre.network.name === "goerli" ||
     hre.network.name === "arbitrum"
   ) {
@@ -29,6 +30,7 @@ export default func;
 func.skip = async (hre: HardhatRuntimeEnvironment) => {
   const shouldSkip =
     hre.network.name === "mainnet" ||
+    hre.network.name === "matic" ||
     hre.network.name === "goerli" ||
     hre.network.name === "arbitrum";
   return shouldSkip ? true : false;
