@@ -53,7 +53,7 @@ contract EjectLP is
 
     // !!!!!!!!!!!!!!!!!!!!!!!! DO NOT CHANGE ORDER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    mapping(uint256 => bytes32) public hashById;
+    mapping(uint256 => bytes32) public override hashById;
     mapping(uint256 => bytes32) public taskById;
 
     uint256 public duration;
@@ -83,6 +83,9 @@ contract EjectLP is
         address receiver
     );
     event LogCancelEject(uint256 indexed tokenId);
+    event LogSetDuration(uint256 duration);
+    event LogSetMinimumFee(uint256 minimumFee);
+    event LogRetrieveDust(address indexed token, uint256 amount);
 
     // !!!!!!!!!!!!!!!!!!!!!!!! MODIFIERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -146,11 +149,14 @@ contract EjectLP is
     }
 
     function setDuration(uint256 duration_) external onlyProxyAdmin {
+        require(duration_ > duration, "EjectLP::setDuration: only increase.");
         duration = duration_;
+        emit LogSetDuration(duration_);
     }
 
     function setMinimumFee(uint256 minimumFee_) external onlyProxyAdmin {
         minimumFee = minimumFee_;
+        emit LogSetMinimumFee(minimumFee_);
     }
 
     function mulipleRetrieveDust(IERC20[] calldata tokens_, address recipient_)
@@ -162,7 +168,10 @@ contract EjectLP is
             for (uint256 i = 0; i < length; ++i) {
                 IERC20 token = tokens_[i];
                 uint256 balance = token.balanceOf(address(this));
-                if (balance > 0) token.safeTransfer(recipient_, balance);
+                if (balance > 0) {
+                    token.safeTransfer(recipient_, balance);
+                    emit LogRetrieveDust(address(token), balance);
+                }
             }
         }
     }
@@ -183,7 +192,6 @@ contract EjectLP is
             orderParams_.maxFeeAmount > minimumFee,
             "EjectLP::schedule: maxFeeAmount < minimumFee"
         );
-
         require(
             orderParams_.maxFeeAmount == msg.value,
             "EjectLP::schedule: maxFeeAmount !== msg.value"
@@ -191,7 +199,7 @@ contract EjectLP is
         require(
             orderParams_.feeToken == ETH,
             "EjectLP::schedule: only native token"
-        );
+        ); // For now only native token can be used.
         require(
             hashById[orderParams_.tokenId] == bytes32(0) &&
                 taskById[orderParams_.tokenId] == bytes32(0),
@@ -208,7 +216,8 @@ contract EjectLP is
             receiver: orderParams_.receiver,
             owner: msg.sender,
             maxFeeAmount: orderParams_.maxFeeAmount,
-            startTime: block.timestamp // solhint-disable-line not-rely-on-time
+            startTime: block.timestamp, // solhint-disable-line not-rely-on-time
+            ejectAtExpiry: orderParams_.ejectAtExpiry
         });
 
         hashById[orderParams_.tokenId] = keccak256(abi.encode(order));
@@ -238,6 +247,10 @@ contract EjectLP is
         Order memory order_,
         bool isEjection_
     ) external override whenNotPaused nonReentrant onlyPokeMe {
+        require(
+            hashById[tokenId_] == keccak256(abi.encode(order_)),
+            "EjectLP::ejectOrSettle: incorrect task hash"
+        );
         if (isEjection_) _eject(tokenId_, order_);
         else _settle(tokenId_, order_);
     }
@@ -269,11 +282,11 @@ contract EjectLP is
     }
 
     // solhint-disable-next-line function-max-lines
-    function canEject(
-        uint256 tokenId_,
-        Order memory order_,
-        address feeToken_
-    ) public view returns (uint128) {
+    function canEject(uint256 tokenId_, Order memory order_)
+        public
+        view
+        returns (uint128)
+    {
         uint128 liquidity;
         IUniswapV3Pool pool;
         {
@@ -296,12 +309,7 @@ contract EjectLP is
             ) = nftPositionManager.positions(tokenId_);
             pool = _pool(factory, token0, token1, feeTier);
         }
-        (bool isOk, string memory reason) = isEjectable(
-            tokenId_,
-            order_,
-            feeToken_,
-            pool
-        );
+        (bool isOk, string memory reason) = isEjectable(tokenId_, order_, pool);
 
         require(isOk, reason);
 
@@ -312,17 +320,11 @@ contract EjectLP is
     function isEjectable(
         uint256 tokenId_,
         Order memory order_,
-        address feeToken_,
         IUniswapV3Pool pool_
-    ) public view override isApproved(tokenId_) returns (bool, string memory) {
-        if (hashById[tokenId_] != keccak256(abi.encode(order_)))
-            return (false, "EjectLP::isEjectable: incorrect task hash");
+    ) public view override returns (bool, string memory) {
         // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration <= block.timestamp)
             return (false, "EjectLP::isEjectable: range order expired");
-
-        if (feeToken_ != ETH)
-            return (false, "EjectLP::isEjectable: only native token");
 
         (, int24 tick, , , , , ) = pool_.slot0();
         int24 tickSpacing = pool_.tickSpacing();
@@ -333,21 +335,21 @@ contract EjectLP is
         if (!order_.ejectAbove && tick >= order_.tickThreshold - tickSpacing)
             return (false, "EjectLP::isEjectable: price not met");
 
+        (bool notApproved, ) = isNotApproved(tokenId_);
+        if (notApproved) return (false, "EjectLP::isEjectable: not approved");
+
         return (true, OK);
     }
 
-    function isExpired(
-        uint256 tokenId_,
-        Order memory order_,
-        address feeToken_
-    ) public view override isApproved(tokenId_) returns (bool, string memory) {
-        if (hashById[tokenId_] != keccak256(abi.encode(order_)))
-            return (false, "EjectLP::isExpired: incorrect task hash");
+    function isExpired(Order memory order_)
+        public
+        view
+        override
+        returns (bool, string memory)
+    {
         // solhint-disable-next-line not-rely-on-time
         if (order_.startTime + duration > block.timestamp)
             return (false, "EjectLP::isExpired: not expired");
-        if (feeToken_ != ETH)
-            return (false, "EjectLP::isExpired: only native token");
         return (true, OK);
     }
 
@@ -365,16 +367,44 @@ contract EjectLP is
         }
     }
 
+    function isNotApproved(uint256 tokenId_)
+        public
+        view
+        override
+        returns (bool, string memory)
+    {
+        if (nftPositionManager.getApproved(tokenId_) != address(this)) {
+            return (true, OK);
+        }
+        return (false, "EjectLP::isNotApproved: EjectLP is approved");
+    }
+
+    function ownerHasChanged(uint256 tokenId_, address owner_)
+        public
+        view
+        override
+        returns (bool, string memory)
+    {
+        if (nftPositionManager.ownerOf(tokenId_) != owner_) {
+            return (true, OK);
+        }
+        return (false, "EjectLP::hasOwnerChanged: owner didn't changed");
+    }
+
     // solhint-disable-next-line function-max-lines
-    function _eject(uint256 tokenId_, Order memory order_) internal {
-        (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
+    function _eject(uint256 tokenId_, Order memory order_)
+        internal
+        onlyPositionOwner(tokenId_, order_.owner)
+        isApproved(tokenId_)
+    {
+        uint256 feeAmount = _getFeeDetails();
 
         require(
             feeAmount <= order_.maxFeeAmount,
             "EjectLP::eject: fee > maxFeeAmount"
         );
 
-        uint128 liquidity = canEject(tokenId_, order_, feeToken);
+        uint128 liquidity = canEject(tokenId_, order_);
 
         (uint256 amount0, uint256 amount1) = _collectAndSend(
             tokenId_,
@@ -387,24 +417,23 @@ contract EjectLP is
     }
 
     function _settle(uint256 tokenId_, Order memory order_) internal {
-        (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
+        uint256 feeAmount = _getFeeDetails();
 
         (bool burnt, ) = isBurnt(tokenId_);
 
-        if (burnt) {
-            _send(tokenId_, order_, feeAmount);
+        if (burnt) return _sendFund(tokenId_, order_, feeAmount);
 
-            emit LogSettle(tokenId_, 0, 0, feeAmount, order_.receiver);
+        (bool hasChanged, ) = ownerHasChanged(tokenId_, order_.owner);
+        if (hasChanged) return _sendFund(tokenId_, order_, feeAmount);
 
-            return;
-        }
+        (bool notApproved, ) = isNotApproved(tokenId_);
+        if (notApproved) return _sendFund(tokenId_, order_, feeAmount);
 
-        (bool expired, string memory reason) = isExpired(
-            tokenId_,
-            order_,
-            feeToken
-        );
+        (bool expired, string memory reason) = isExpired(order_);
         require(expired, reason);
+
+        if (!order_.ejectAtExpiry)
+            return _sendFund(tokenId_, order_, feeAmount);
 
         (, , , , , , , uint128 liquidity, , , , ) = nftPositionManager
             .positions(tokenId_);
@@ -435,6 +464,16 @@ contract EjectLP is
         _send(tokenId_, order_, feeAmount_);
     }
 
+    function _sendFund(
+        uint256 tokenId_,
+        Order memory order_,
+        uint256 feeAmount_
+    ) internal {
+        _send(tokenId_, order_, feeAmount_);
+
+        emit LogSettle(tokenId_, 0, 0, feeAmount_, order_.receiver);
+    }
+
     function _send(
         uint256 tokenId_,
         Order memory order_,
@@ -445,15 +484,26 @@ contract EjectLP is
         delete hashById[tokenId_];
         delete taskById[tokenId_];
 
+        // !!!!!!!!! Settlement can be done even if it's costlier than maxFeeAmount !!!!!!!!!!
+
         // gelato fee in native token
-        AddressUpgradeable.sendValue(payable(_gelato), feeAmount_);
+        AddressUpgradeable.sendValue(
+            payable(_gelato),
+            feeAmount_ < order_.maxFeeAmount ? feeAmount_ : order_.maxFeeAmount
+        );
         if (feeAmount_ < order_.maxFeeAmount) {
             unchecked {
                 AddressUpgradeable.sendValue(
-                    payable(order_.receiver),
+                    order_.receiver,
                     order_.maxFeeAmount - feeAmount_
                 );
             }
         }
+    }
+
+    function _getFeeDetails() internal view returns (uint256) {
+        (uint256 feeAmount, address feeToken) = pokeMe.getFeeDetails();
+        require(feeToken == ETH, "EjectLP: only native token");
+        return feeAmount;
     }
 }
