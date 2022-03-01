@@ -13,6 +13,7 @@ import { ISwapRouter } from "../typechain/ISwapRouter";
 // import { IWETH9 } from "../typechain/IWETH9";
 import { BigNumber } from "@ethersproject/bignumber";
 import { Contract } from "ethers";
+import { getAmountsIn } from "./utils";
 
 const { ethers, deployments } = hre;
 
@@ -33,6 +34,10 @@ describe("Cancel Eject LP Tests", function () {
   let tickThreshold: number;
   let amountIn: BigNumber;
   let receiver: string;
+
+  let tick: number;
+  let tickSpacing: number;
+  let sqrtPriceX96: BigNumber;
 
   let tokenId: number;
 
@@ -115,7 +120,10 @@ describe("Cancel Eject LP Tests", function () {
     )) as IUniswapV3Pool;
 
     const slot0 = await pool.slot0();
-    const tickSpacing = await pool.tickSpacing();
+    tickSpacing = await pool.tickSpacing();
+
+    sqrtPriceX96 = slot0.sqrtPriceX96;
+    tick = slot0.tick;
 
     tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
 
@@ -136,12 +144,22 @@ describe("Cancel Eject LP Tests", function () {
 
     maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -158,6 +176,15 @@ describe("Cancel Eject LP Tests", function () {
   });
 
   it("#0: Submission should work.", async () => {
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     const etherBalance = await user.getBalance();
     const tx = await rangeOrder.cancelRangeOrder(
       145227,
@@ -166,6 +193,7 @@ describe("Cancel Eject LP Tests", function () {
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -184,6 +212,15 @@ describe("Cancel Eject LP Tests", function () {
   });
 
   it("#1: Submission should failed. Transaction sender = user submitted range order", async () => {
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.connect(user2).cancelRangeOrder(
         145227,
@@ -192,6 +229,7 @@ describe("Cancel Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -201,6 +239,15 @@ describe("Cancel Eject LP Tests", function () {
   });
 
   it("#2: Submission should failed. Cannot cancel the wrong order.", async () => {
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.cancelRangeOrder(
         145227,
@@ -209,6 +256,7 @@ describe("Cancel Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee.add(1),
         },
@@ -218,6 +266,15 @@ describe("Cancel Eject LP Tests", function () {
   });
 
   it("#3: Submission should failed. Range order already executed.", async () => {
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     let [canExec] = await rangeOrderResolver.checker(
       tokenId,
       {
@@ -288,6 +345,7 @@ describe("Cancel Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },

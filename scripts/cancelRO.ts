@@ -27,6 +27,7 @@ async function main(signer: SignerWithAddress | string) {
       tickThreshold: 39300,
       amountIn: ethers.utils.parseUnits("400", 18),
       receiver: isString(signer) ? signer : signer.address,
+      minLiquidity: ethers.constants.Zero,
       maxFeeAmount: ethers.utils.parseEther("0.005"),
     },
     1638798518
