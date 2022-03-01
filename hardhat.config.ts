@@ -13,6 +13,7 @@ dotenv.config({ path: __dirname + "/.env" });
 
 const PK = process.env.PK;
 const PK_MAINNET = process.env.PK_MAINNET;
+const DEPLOYER_PK_POLYGON = process.env.DEPLOYER_PK_POLYGON;
 const PK_ARBITRUM = process.env.PK_ARBITRUM;
 const ALCHEMY_ID = process.env.ALCHEMY_ID;
 const ARBITRUM_ALCHEMY_ID = process.env.ARBITRUM_ALCHEMY_ID;
@@ -29,6 +30,7 @@ const config: HardhatUserConfig = {
     gelatoMultiSig: {
       arbitrum: "0xa2BC74F8C81b46BADbD8C20bF9Bd31DAd2CEDba8",
       mainnet: "0xeD5cF41b0fD6A3C564c17eE34d9D26Eafc30619b",
+      matic: "0x02864B9A53fd250900Ba74De507a56503C3DC90b",
     },
   },
 
@@ -53,6 +55,11 @@ const config: HardhatUserConfig = {
       chainId: 42161,
       url: `https://arb-mainnet.g.alchemy.com/v2/${ARBITRUM_ALCHEMY_ID}`,
       gasPrice: parseInt(utils.parseUnits("2", "gwei").toString()),
+    },
+    matic: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_ID}`,
+      chainId: 137,
+      accounts: DEPLOYER_PK_POLYGON ? [DEPLOYER_PK_POLYGON] : [],
     },
     mainnet: {
       accounts: PK_MAINNET ? [PK_MAINNET] : [],

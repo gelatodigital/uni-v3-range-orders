@@ -21,6 +21,8 @@ interface IEjectLP {
         bool isEjection_
     ) external;
 
+    function hashById(uint256 tokenId_) external view returns (bytes32);
+
     function factory() external view returns (address);
 
     function pokeMe() external view returns (IPokeMe);
@@ -33,13 +35,26 @@ interface IEjectLP {
     function isEjectable(
         uint256 tokenId_,
         Order memory order_,
-        address feeToken_,
         IUniswapV3Pool pool_
     ) external view returns (bool, string memory);
 
-    function isExpired(
-        uint256 tokenId_,
-        Order memory order_,
-        address feeToken_
-    ) external view returns (bool, string memory);
+    function isExpired(Order memory order_)
+        external
+        view
+        returns (bool, string memory);
+
+    function isBurnt(uint256 tokenId_)
+        external
+        view
+        returns (bool, string memory);
+
+    function isNotApproved(uint256 tokenId_)
+        external
+        view
+        returns (bool, string memory);
+
+    function ownerHasChanged(uint256 tokenId_, address owner_)
+        external
+        view
+        returns (bool, string memory);
 }

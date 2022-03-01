@@ -8,6 +8,7 @@ import {IEjectResolver} from "./IEjectResolver.sol";
 import {IEjectLP} from "./IEjectLP.sol";
 import {Order} from "./structs/SEject.sol";
 import {_pool} from "./functions/FEjectLp.sol";
+import {ETH} from "./constants/CEjectLP.sol";
 
 contract RangeOrderResolver is IEjectResolver {
     IEjectLP public immutable ejectLP;
@@ -22,7 +23,12 @@ contract RangeOrderResolver is IEjectResolver {
         Order memory order_,
         address feeToken_
     ) external view override returns (bool, bytes memory data) {
-        (bool isExpired, ) = ejectLP.isExpired(tokenId_, order_, feeToken_);
+        if (
+            feeToken_ != ETH ||
+            ejectLP.hashById(tokenId_) != keccak256(abi.encode(order_))
+        ) return (false, "");
+
+        (bool isExpired, ) = ejectLP.isExpired(order_);
         if (isExpired)
             return (
                 true,
@@ -49,12 +55,7 @@ contract RangeOrderResolver is IEjectResolver {
 
         ) = ejectLP.nftPositionManager().positions(tokenId_);
         IUniswapV3Pool pool = _pool(ejectLP.factory(), token0, token1, feeTier);
-        (bool isEjectable, ) = ejectLP.isEjectable(
-            tokenId_,
-            order_,
-            feeToken_,
-            pool
-        );
+        (bool isEjectable, ) = ejectLP.isEjectable(tokenId_, order_, pool);
         if (isEjectable)
             return (
                 true,

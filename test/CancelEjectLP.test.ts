@@ -227,6 +227,7 @@ describe("Cancel Eject LP Tests", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(submissionBlockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -268,6 +269,7 @@ describe("Cancel Eject LP Tests", function () {
         owner: rangeOrder.address,
         maxFeeAmount: maxFee,
         startTime: ethers.BigNumber.from(submissionBlockTime ?? 0),
+        ejectAtExpiry: true,
       },
       ETH
     );
@@ -291,7 +293,7 @@ describe("Cancel Eject LP Tests", function () {
         },
         submissionBlockTime
       )
-    ).to.be.revertedWith("EjectLP::cancel: price met");
+    ).to.not.be.reverted;
 
     // Cancel Ejection
   });

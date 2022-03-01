@@ -64,6 +64,22 @@ export const getAddresses = (network: string): Addresses => {
         RangeOrdersResolver: "",
         TestPool: "",
       };
+    case "matic":
+      return {
+        PokeMe: "0x527a819db1eb0e34426297b03bae11F2f8B3A19E",
+        NonfungiblePositionManager:
+          "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+        UniswapV3Factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+        SwapRouter: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        Gelato: "0x7598e84B2E114AB62CAB288CE5f7d5f6bad35BbA",
+        WETH: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // On matic we replace WETH by WMatic
+        DAI: "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
+        USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+        EjectLP: "",
+        RangeOrders: "",
+        RangeOrdersResolver: "",
+        TestPool: "",
+      };
     case "goerli":
       return {
         PokeMe: "0xc1C6805B857Bef1f412519C4A842522431aFed39",
