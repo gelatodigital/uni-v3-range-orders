@@ -160,7 +160,7 @@ contract RangeOrder is
                     );
                 }
 
-                tokenIn.safeApprove(
+                tokenIn.safeIncreaseAllowance(
                     address(nftPositionManager),
                     params_.amountIn
                 );
