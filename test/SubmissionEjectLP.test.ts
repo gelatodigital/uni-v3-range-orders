@@ -6,6 +6,7 @@ import { Addresses, getAddresses } from "../src/addresses";
 import { ISwapRouter } from "../typechain/ISwapRouter";
 import { IWETH9 } from "../typechain/IWETH9";
 import { Contract } from "ethers";
+import { getAmountsIn } from "./utils";
 
 const { ethers, deployments } = hre;
 
@@ -74,6 +75,9 @@ describe("Submission Eject LP Tests", function () {
 
     const minAmountOut = ethers.utils.parseEther("10");
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickThreshold =
       slot0.tick - (slot0.tick % tickSpacing) + tickSpacing + 1;
 
@@ -94,6 +98,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -101,6 +114,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -126,6 +140,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const minAmountOut = ethers.utils.parseEther("10");
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) - tickSpacing;
@@ -147,6 +164,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -154,6 +180,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -179,6 +206,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
 
     const amountIn = ethers.utils.parseEther("42000");
@@ -191,6 +221,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -198,6 +237,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -221,6 +261,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const amountIn = ethers.utils.parseEther("10");
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) - tickSpacing;
@@ -231,6 +274,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -238,6 +290,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: false,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -261,6 +314,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const amountIn = ethers.utils.parseEther("10");
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) - tickSpacing;
@@ -269,6 +325,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -276,6 +341,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: false,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -317,6 +383,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const minAmountOut = ethers.utils.parseEther("10");
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
@@ -338,6 +407,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -345,6 +423,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },
@@ -386,6 +465,9 @@ describe("Submission Eject LP Tests", function () {
     const slot0 = await pool.slot0();
     const tickSpacing = await pool.tickSpacing();
 
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const minAmountOut = ethers.utils.parseEther("10");
 
     const tickThreshold = slot0.tick - (slot0.tick % tickSpacing) + tickSpacing;
@@ -407,6 +489,15 @@ describe("Submission Eject LP Tests", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await expect(
       rangeOrder.setRangeOrder(
         {
@@ -414,6 +505,7 @@ describe("Submission Eject LP Tests", function () {
           zeroForOne: true,
           tickThreshold,
           amountIn: amountIn,
+          minLiquidity: minAmountIn.amount0,
           receiver,
           maxFeeAmount: maxFee,
         },

@@ -160,15 +160,27 @@ contract RangeOrder is
                     );
                 }
 
-                tokenIn.safeApprove(
+                tokenIn.safeIncreaseAllowance(
                     address(nftPositionManager),
                     params_.amountIn
                 );
             }
 
             {
-                uint256 amount0 = params_.zeroForOne ? params_.amountIn : 0;
-                uint256 amount1 = params_.zeroForOne ? 0 : params_.amountIn;
+                uint256 amount0;
+                uint256 amount1;
+                uint256 minLiquidity0;
+                uint256 minLiquidity1;
+                if (params_.zeroForOne) {
+                    amount0 = params_.amountIn;
+                    minLiquidity0 = params_.minLiquidity;
+                    amount1 = minLiquidity1 = 0;
+                } else {
+                    amount0 = minLiquidity0 = 0;
+                    amount1 = params_.amountIn;
+                    minLiquidity1 = params_.minLiquidity;
+                }
+
                 (tokenId, , , ) = nftPositionManager.mint(
                     INonfungiblePositionManager.MintParams({
                         token0: token0,
@@ -178,8 +190,8 @@ contract RangeOrder is
                         tickUpper: upperTick,
                         amount0Desired: amount0,
                         amount1Desired: amount1,
-                        amount0Min: amount0,
-                        amount1Min: amount1,
+                        amount0Min: minLiquidity0,
+                        amount1Min: minLiquidity1,
                         recipient: address(this),
                         deadline: block.timestamp // solhint-disable-line not-rely-on-time
                     })

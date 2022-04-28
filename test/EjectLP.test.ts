@@ -13,6 +13,7 @@ import { Addresses, getAddresses } from "../src/addresses";
 import { ISwapRouter } from "../typechain/ISwapRouter";
 import { IWETH9 } from "../typechain/IWETH9";
 import { Contract } from "ethers";
+import { getAmountsIn } from "./utils";
 
 const { ethers, deployments } = hre;
 
@@ -113,6 +114,10 @@ describe("Eject LP Integration Test", function () {
     )) as IUniswapV3Pool;
 
     const slot0 = await pool.slot0();
+
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickSpacing = await pool.tickSpacing();
 
     const minAmountOut = ethers.utils.parseEther("10");
@@ -136,12 +141,22 @@ describe("Eject LP Integration Test", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -296,6 +311,10 @@ describe("Eject LP Integration Test", function () {
     )) as IUniswapV3Pool;
 
     const slot0 = await pool.slot0();
+
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickSpacing = await pool.tickSpacing();
 
     const minAmountOut = ethers.utils.parseEther("10");
@@ -319,12 +338,22 @@ describe("Eject LP Integration Test", function () {
 
     const maxFee = ethers.utils.parseEther("0.2");
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -478,6 +507,10 @@ describe("Eject LP Integration Test", function () {
     )) as IUniswapV3Pool;
 
     const slot0 = await pool.slot0();
+
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickSpacing = await pool.tickSpacing();
 
     const minAmountOut = ethers.utils.parseEther("10");
@@ -499,12 +532,22 @@ describe("Eject LP Integration Test", function () {
 
     await dai.approve(rangeOrder.address, amountIn);
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -550,6 +593,10 @@ describe("Eject LP Integration Test", function () {
     )) as IUniswapV3Pool;
 
     const slot0 = await pool.slot0();
+
+    const sqrtPriceX96 = slot0.sqrtPriceX96;
+    const tick = slot0.tick;
+
     const tickSpacing = await pool.tickSpacing();
 
     const minAmountOut = ethers.utils.parseEther("10");
@@ -573,12 +620,22 @@ describe("Eject LP Integration Test", function () {
 
     expect(await dai.balanceOf(receiver)).to.be.eq(amountIn);
 
+    const minAmountIn = getAmountsIn(
+      tick,
+      tickThreshold,
+      tickThreshold + tickSpacing,
+      amountIn,
+      ethers.constants.Zero,
+      sqrtPriceX96
+    );
+
     const tx = await rangeOrder.setRangeOrder(
       {
         pool: pool.address,
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },
@@ -602,6 +659,7 @@ describe("Eject LP Integration Test", function () {
         zeroForOne: true,
         tickThreshold,
         amountIn: amountIn,
+        minLiquidity: minAmountIn.amount0,
         receiver,
         maxFeeAmount: maxFee,
       },

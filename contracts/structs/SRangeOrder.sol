@@ -10,6 +10,7 @@ struct RangeOrderParams {
     bool zeroForOne;
     int24 tickThreshold;
     uint256 amountIn;
+    uint256 minLiquidity;
     address payable receiver;
     uint256 maxFeeAmount;
 }
